@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from datetime import date
 from html.parser import HTMLParser
+from html import escape, unescape
 from pathlib import Path
 from urllib.parse import urlsplit
 import re
@@ -128,6 +129,47 @@ def localize_html_urls(raw: str, page: Path, dist: Path) -> str:
     return attr.sub(lambda m: m.group("prefix") + m.group("q") + relative_site_url(m.group("url"), page, dist) + m.group("q"), raw)
 
 
+def enhance_article(raw: str, page: Path, dist: Path) -> str:
+    """Add a navigable contents list and a factual author note to long article pages."""
+    if page.parent.parent.name != "articles" or page.parent.name == "articles":
+        return raw
+    match = re.search(r'(<article class="article-content">)(.*?)(</article>)', raw, re.S)
+    if not match:
+        return raw
+    body = match.group(2)
+    heading_pattern = re.compile(r'<h2\\b([^>]*)>(.*?)</h2>', re.S)
+    headings = list(heading_pattern.finditer(body))
+    if len(headings) >= 5 and 'class="article-toc"' not in body:
+        replacements = []
+        links = []
+        for index, heading in enumerate(headings, 1):
+            attrs, inner = heading.group(1), heading.group(2)
+            existing = re.search(r'\\bid=["\\']([^"\\']+)["\\']', attrs)
+            anchor_id = existing.group(1) if existing else f"article-section-{index}"
+            label = unescape(re.sub(r"<[^>]+>", "", inner)).strip()
+            if not existing:
+                replacement = f'<h2{attrs} id="{anchor_id}">{inner}</h2>'
+                replacements.append((heading.start(), heading.end(), replacement))
+            links.append(f'<li><a href="#{escape(anchor_id, quote=True)}">{escape(label)}</a></li>')
+        for start, end, replacement in reversed(replacements):
+            body = body[:start] + replacement + body[end:]
+        toc = '<nav class="article-toc" aria-label="Содержание статьи"><strong>Содержание</strong><ol>' + "".join(links) + '</ol></nav>'
+        meta = re.search(r'(<p class="article-meta">.*?</p>)', body, re.S)
+        if meta:
+            body = body[:meta.end()] + toc + body[meta.end():]
+        else:
+            body = toc + body
+    if 'class="article-author"' not in body:
+        about_url = relative_site_url("/about/", page, dist)
+        author = (
+            '<aside class="article-author"><p><strong>Автор материала</strong><br>'
+            'Елена Алексеевна Глебова, адвокат Адвокатской палаты Московской области.</p>'
+            f'<a href="{escape(about_url, quote=True)}">Сведения об адвокате</a></aside>'
+        )
+        body += author
+    return raw[:match.start(2)] + body + raw[match.end(2):]
+
+
 def resolve_local(path: str, dist: Path, page: Path) -> bool:
     if not path or path == "#":
         return True
@@ -195,6 +237,7 @@ def main() -> int:
         else:
             raw = raw.replace(marker, "")
         raw = raw.replace("__CANONICAL_URL__", canonical)
+        raw = enhance_article(raw, page, dist)
         raw = localize_html_urls(raw, page, dist)
         # The distinction between the free organisational call and paid legal advice is visible site-wide.
         if "</footer>" in raw and "footer-brief-note" not in raw:
