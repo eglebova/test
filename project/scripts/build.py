@@ -137,14 +137,14 @@ def enhance_article(raw: str, page: Path, dist: Path) -> str:
     if not match:
         return raw
     body = match.group(2)
-    heading_pattern = re.compile(r'<h2\\b([^>]*)>(.*?)</h2>', re.S)
+    heading_pattern = re.compile(r'<h2\b([^>]*)>(.*?)</h2>', re.S)
     headings = list(heading_pattern.finditer(body))
     if len(headings) >= 5 and 'class="article-toc"' not in body:
         replacements = []
         links = []
         for index, heading in enumerate(headings, 1):
             attrs, inner = heading.group(1), heading.group(2)
-            existing = re.search(r'\\bid=["\\']([^"\\']+)["\\']', attrs)
+            existing = re.search(r"\bid=['\"]([^'\"]+)['\"]", attrs)
             anchor_id = existing.group(1) if existing else f"article-section-{index}"
             label = unescape(re.sub(r"<[^>]+>", "", inner)).strip()
             if not existing:
