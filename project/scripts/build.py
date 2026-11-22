@@ -318,14 +318,12 @@ def main() -> int:
             errors.append(f"{rel}: viewport meta is missing")
         if parser.h1_count != 1:
             errors.append(f"{rel}: expected exactly one h1, found {parser.h1_count}")
-        if parser.form_count and not rel.endswith("contacts/index.html"):
-            errors.append(f"{rel}: forms are allowed only on contacts page")
+        if parser.form_count:
+            errors.append(f"{rel}: HTML forms are disabled in this release")
         if parser.iframe_count:
             errors.append(f"{rel}: iframe is not allowed")
-        if parser.form_count and re.search(r'type=[\"\']file', raw, re.I):
-            errors.append(f"{rel}: file upload controls are prohibited")
-        if parser.script_count and (rel != "contacts/index.html" or "../assets/contact-form.js" not in raw):
-            errors.append(f"{rel}: only the local contact-form script is allowed")
+        if parser.script_count:
+            errors.append(f"{rel}: JavaScript is disabled in this release")
         if parser.inline_handlers:
             errors.append(f"{rel}: inline event handler found: {parser.inline_handlers[0]}")
         if parser.refresh_meta:
