@@ -528,3 +528,25 @@ img { max-width: 100%; height: auto; }
   .consultation-answer { padding:19px 21px 22px; }
   .consultation-question { font-size:19px; }
 }
+
+
+/* Click-to-open consultation references (CSP-safe, no inline scripts). */
+.consultation-reference{min-width:0;padding:.15rem 0}
+.consultation-footnote{display:inline;color:var(--link,#315d83);font:inherit;font-size:.96rem;line-height:1.55;text-align:left;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;cursor:pointer}
+.consultation-footnote:hover{color:var(--accent,#9a7445)}
+.consultation-footnote:focus-visible,.consultation-modal__close:focus-visible,.consultation-modal__backdrop:focus-visible{outline:2px solid currentColor;outline-offset:4px}
+.consultation-modal{display:none;position:fixed;inset:0;z-index:10000;align-items:center;justify-content:center;padding:24px;background:rgba(12,22,35,.66);backdrop-filter:blur(2px)}
+.consultation-modal:target{display:flex}
+.consultation-modal__backdrop{position:absolute;inset:0;display:block}
+.consultation-modal__window{position:relative;z-index:1;display:flex;flex-direction:column;width:min(780px,100%);max-height:calc(100vh - 48px);border:1px solid rgba(30,45,62,.18);border-radius:12px;background:#fff;color:#253142;box-shadow:0 24px 80px rgba(9,20,35,.28);overflow:hidden}
+.consultation-modal__header{display:flex;flex:0 0 auto;align-items:center;justify-content:space-between;gap:1rem;padding:16px 22px;border-bottom:1px solid #e7eaf0;background:#fff}
+.consultation-modal__header strong{font-size:1rem;letter-spacing:.01em}
+.consultation-modal__close{display:inline-flex;flex:0 0 36px;align-items:center;justify-content:center;width:36px;height:36px;border:0;border-radius:50%;background:#f1f3f6;color:#26364a;font-size:25px;line-height:1;text-decoration:none;cursor:pointer}
+.consultation-modal__body{padding:20px 24px 26px;overflow-y:auto;overscroll-behavior:contain;line-height:1.68}
+.consultation-modal__body h3{margin:0 0 .7rem;font-size:1rem;color:#253d59}
+.consultation-modal__question{padding-bottom:16px;border-bottom:1px solid #e7eaf0}
+.consultation-modal__answer{padding-top:16px}
+.consultation-modal__body p{margin:.55rem 0}
+.consultation-modal__body ul,.consultation-modal__body ol{padding-left:1.4rem}
+.consultation-modal__body li{margin:.25rem 0}
+@media(max-width:600px){.consultation-modal{padding:10px}.consultation-modal__window{max-height:calc(100vh - 20px);border-radius:10px}.consultation-modal__header{padding:13px 17px}.consultation-modal__body{padding:16px 18px 22px}}
