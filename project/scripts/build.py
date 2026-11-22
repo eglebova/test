@@ -1,0 +1,290 @@
+#!/usr/bin/env python3
+"""Build and validate the no-backend static website using only Python stdlib."""
+from __future__ import annotations
+import argparse
+from datetime import date
+from html.parser import HTMLParser
+from pathlib import Path
+from urllib.parse import urlsplit
+import re
+import posixpath
+import shutil
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+PUBLIC_ITEMS = [
+    "index.html", "404.html", "favicon.svg", "robots.txt", ".htaccess",
+    "assets", "about", "practice", "working-process", "remuneration", "documents", "contacts", "articles",
+]
+FORBIDDEN = [
+    "адрес офиса", "адрес адвокатского кабинета", "пресненский",
+    "записаться на приём", "записаться в офис", "личный приём",
+    "карта проезда", "схема проезда", "координаты", "postaladdress", "streetaddress",
+    "58 918", "58918", "3 000+", "3000+", "92%",
+    "гарантируем результат", "гарантия выигрыша", "выиграем дело", "100% выигрыш",
+    "лучший адвокат", "номер один", "отзывы доверителей", "рейтинг адвоката",
+    "уголовные дела", "защита по уголовным делам", "юридическая компания", "юридическая фирма",
+    "публичная оферта", "акцепт оферты", "загрузить документы", "прикрепить файл",
+]
+
+class PageParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.links: list[str] = []
+        self.title = False
+        self.has_title = False
+        self.h1_count = 0
+        self.has_description = False
+        self.has_viewport = False
+        self.has_lang = False
+        self.form_count = 0
+        self.iframe_count = 0
+        self.script_count = 0
+        self.external_assets: list[str] = []
+        self.img_without_alt = 0
+        self.inline_handlers: list[str] = []
+        self.refresh_meta = 0
+        self.embedded_content = 0
+        self.unsafe_new_tabs = 0
+        self._in_title = False
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        for name in a:
+            if name and name.lower().startswith("on"):
+                self.inline_handlers.append(name)
+        if tag == "html" and a.get("lang") == "ru":
+            self.has_lang = True
+        if tag == "title":
+            self._in_title = True
+        if tag == "h1":
+            self.h1_count += 1
+        if tag == "meta":
+            if a.get("name", "").lower() == "description" and a.get("content"):
+                self.has_description = True
+            if a.get("name", "").lower() == "viewport" and a.get("content"):
+                self.has_viewport = True
+            if a.get("http-equiv", "").lower() == "refresh":
+                self.refresh_meta += 1
+        if tag == "a" and a.get("href"):
+            self.links.append(a["href"])
+            if a.get("target", "").lower() == "_blank" and not {x.lower() for x in a.get("rel", "").split()} & {"noopener", "noreferrer"}:
+                self.unsafe_new_tabs += 1
+        if tag in ("img", "script") or (tag == "link" and a.get("rel", "").lower() in ("stylesheet", "icon", "preload", "modulepreload")):
+            attr = "src" if tag in ("img", "script") else "href"
+            val = a.get(attr, "")
+            if val.startswith(("http://", "https://", "//")):
+                self.external_assets.append(val)
+        if tag == "img" and "alt" not in a:
+            self.img_without_alt += 1
+        if tag == "form":
+            self.form_count += 1
+        if tag == "iframe":
+            self.iframe_count += 1
+        if tag in ("object", "embed", "audio", "video"):
+            self.embedded_content += 1
+        if tag == "script":
+            self.script_count += 1
+
+    def handle_endtag(self, tag):
+        if tag == "title":
+            self._in_title = False
+            self.has_title = True
+
+
+def collect_html_files(folder: Path) -> list[Path]:
+    return sorted(folder.rglob("*.html"))
+
+
+def url_for_page(dist: Path, page: Path) -> str:
+    rel = page.relative_to(dist).as_posix()
+    if rel == "index.html":
+        return "/"
+    if rel.endswith("/index.html"):
+        return "/" + rel[:-len("index.html")]
+    return "/" + rel
+
+
+def relative_site_url(value: str, page: Path, dist: Path) -> str:
+    """Rewrite site-root URLs as page-relative URLs so the site also works via file://."""
+    if not value.startswith("/") or value.startswith("//"):
+        return value
+    from urllib.parse import urlunsplit
+    parsed = urlsplit(value)
+    page_parent = page.parent.relative_to(dist).as_posix()
+    target = parsed.path.lstrip("/") or "."
+    rel = posixpath.relpath(target, start=page_parent)
+    if rel == ".":
+        rel = "./"
+    elif parsed.path.endswith("/") and not rel.endswith("/"):
+        rel += "/"
+    return urlunsplit(("", "", rel, parsed.query, parsed.fragment))
+
+
+def localize_html_urls(raw: str, page: Path, dist: Path) -> str:
+    attr = re.compile(r'(?P<prefix>\b(?:href|src|poster)\s*=\s*)(?P<q>["\'])(?P<url>[^"\']*)(?P=q)', re.I)
+    return attr.sub(lambda m: m.group("prefix") + m.group("q") + relative_site_url(m.group("url"), page, dist) + m.group("q"), raw)
+
+
+def resolve_local(path: str, dist: Path, page: Path) -> bool:
+    if not path or path == "#":
+        return True
+    parsed = urlsplit(path)
+    if parsed.scheme or parsed.netloc:
+        return True
+    if not parsed.path:
+        return True
+    candidate_path = parsed.path
+    candidate = (page.parent / candidate_path).resolve()
+    try:
+        candidate.relative_to(dist)
+    except ValueError:
+        return False
+    candidates = [candidate, candidate / "index.html"]
+    return any(p.is_file() for p in candidates)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Build static site and run content/link QA")
+    ap.add_argument("--origin", required=True, help="Canonical HTTPS origin, e.g. https://example.ru")
+    ap.add_argument("--out", default=str(ROOT / "dist"), help="Output directory (default: ./dist)")
+    args = ap.parse_args()
+    origin = args.origin.rstrip("/")
+    parsed_origin = urlsplit(origin)
+    if parsed_origin.scheme != "https" or not parsed_origin.netloc or parsed_origin.path:
+        print("FAIL: --origin must be an HTTPS origin without path, e.g. https://example.ru", file=sys.stderr)
+        return 2
+    if any(ch in origin for ch in " <>\"'`"):
+        print("FAIL: invalid characters in --origin", file=sys.stderr)
+        return 2
+
+    dist = Path(args.out).resolve()
+    if dist == ROOT or ROOT in dist.parents and dist == ROOT:
+        print("FAIL: output directory cannot be project root", file=sys.stderr)
+        return 2
+    if dist.exists():
+        shutil.rmtree(dist)
+    dist.mkdir(parents=True)
+
+    for item in PUBLIC_ITEMS:
+        src = ROOT / item
+        if not src.exists():
+            print(f"FAIL: missing required public item: {item}", file=sys.stderr)
+            return 2
+        dst = dist / item
+        if src.is_dir():
+            shutil.copytree(src, dst)
+        else:
+            shutil.copy2(src, dst)
+
+    html_files = collect_html_files(dist)
+    errors: list[str] = []
+    checked_links = 0
+    for page in html_files:
+        raw = page.read_text(encoding="utf-8")
+        public_path = url_for_page(dist, page)
+        canonical = origin + public_path
+        marker = '  <!-- canonical and og:url are injected by scripts/build.py after the domain is selected -->'
+        if page.name != "404.html":
+            inject = f'<link rel="canonical" href="{canonical}">\n  <meta property="og:url" content="{canonical}">'
+            raw = raw.replace(marker, "  " + inject)
+        else:
+            raw = raw.replace(marker, "")
+        raw = raw.replace("__CANONICAL_URL__", canonical)
+        raw = localize_html_urls(raw, page, dist)
+        page.write_text(raw, encoding="utf-8")
+
+        parser = PageParser()
+        parser.feed(raw)
+        rel = page.relative_to(dist).as_posix()
+        if not parser.has_lang:
+            errors.append(f"{rel}: html lang=ru is missing")
+        if not parser.has_title:
+            errors.append(f"{rel}: title is missing")
+        if not parser.has_description:
+            errors.append(f"{rel}: meta description is missing")
+        if not parser.has_viewport:
+            errors.append(f"{rel}: viewport meta is missing")
+        if parser.h1_count != 1:
+            errors.append(f"{rel}: expected exactly one h1, found {parser.h1_count}")
+        if parser.form_count and not rel.endswith("contacts/index.html"):
+            errors.append(f"{rel}: forms are allowed only on contacts page")
+        if parser.iframe_count:
+            errors.append(f"{rel}: iframe is not allowed")
+        if parser.form_count and re.search(r'type=[\"\']file', raw, re.I):
+            errors.append(f"{rel}: file upload controls are prohibited")
+        if parser.script_count and (rel != "contacts/index.html" or "../assets/contact-form.js" not in raw):
+            errors.append(f"{rel}: only the local contact-form script is allowed")
+        if parser.inline_handlers:
+            errors.append(f"{rel}: inline event handler found: {parser.inline_handlers[0]}")
+        if parser.refresh_meta:
+            errors.append(f"{rel}: meta refresh redirect is not allowed")
+        if parser.embedded_content:
+            errors.append(f"{rel}: embedded active/media content is not allowed in release 1")
+        if parser.unsafe_new_tabs:
+            errors.append(f"{rel}: target=_blank link needs rel=noopener or noreferrer")
+        if parser.external_assets:
+            errors.append(f"{rel}: external asset request found: {parser.external_assets[0]}")
+        if parser.img_without_alt:
+            errors.append(f"{rel}: image without alt attribute")
+        for href in parser.links:
+            checked_links += 1
+            parsed = urlsplit(href)
+            if parsed.scheme in ("mailto", "tel", "https", "http") or parsed.netloc or href.startswith("#"):
+                continue
+            if not resolve_local(href, dist, page):
+                errors.append(f"{rel}: unresolved local link {href}")
+
+    # Content restrictions are checked against the complete public build, including metadata.
+    for file in dist.rglob("*"):
+        if not file.is_file():
+            continue
+        try:
+            text = file.read_text(encoding="utf-8").lower()
+        except UnicodeDecodeError:
+            continue
+        for pattern in FORBIDDEN:
+            if pattern.lower() in text:
+                errors.append(f"{file.relative_to(dist).as_posix()}: forbidden content pattern: {pattern}")
+        if "__canonical_url__" in text or "__site_origin__" in text:
+            errors.append(f"{file.relative_to(dist).as_posix()}: unresolved template token")
+
+    # Do not invite indexing of reserved/test origins used for local QA.
+    is_test_origin = parsed_origin.hostname in {"localhost", "127.0.0.1", "qa.invalid", "example.invalid"} or (parsed_origin.hostname or "").endswith(".invalid")
+    if is_test_origin:
+        robots_text = "User-agent: *\nDisallow: /\n"
+    else:
+        robots_text = "User-agent: *\nAllow: /\nDisallow: /.git/\nDisallow: /.env\nSitemap: " + origin + "/sitemap.xml\n"
+    (dist / "robots.txt").write_text(robots_text, encoding="utf-8")
+    urls = []
+    for page in html_files:
+        if page.name == "404.html":
+            continue
+        page_text = page.read_text(encoding="utf-8").lower()
+        if 'name="robots" content="noindex' in page_text:
+            continue
+        path = url_for_page(dist, page)
+        urls.append((origin + path, date.today().isoformat()))
+    sitemap = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for loc, lastmod in urls:
+        sitemap.append(f'  <url><loc>{loc}</loc><lastmod>{lastmod}</lastmod></url>')
+    sitemap.append('</urlset>')
+    (dist / "sitemap.xml").write_text("\n".join(sitemap) + "\n", encoding="utf-8")
+
+    # Check deployment artifacts and ensure only whitelisted public material is emitted.
+    actual = sorted(p.relative_to(dist).as_posix() for p in dist.rglob("*") if p.is_file())
+    if any(p.startswith(("scripts/", "deploy/", "project-notes/", "config/")) for p in actual):
+        errors.append("private development material leaked into dist")
+    if errors:
+        print(f"FAIL: {len(errors)} issue(s)")
+        for e in errors:
+            print(" -", e)
+        return 1
+    print("PASS: static build created")
+    print(f"Pages: {len(html_files)} | Internal links checked: {checked_links} | Canonical origin: {origin}")
+    print("Static release: no server-side form processing, uploads, analytics, cookies or external assets. Contact form only prepares a local mailto draft.")
+    print(f"Output: {dist}")
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())

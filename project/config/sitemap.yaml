@@ -1,0 +1,20 @@
+version: 1
+source: scripts/build.py
+pages:
+  - {url: "/", priority: 1.0, changefreq: "monthly"}
+  - {url: "/about/", priority: 0.8, changefreq: "yearly"}
+  - {url: "/practice/", priority: 0.9, changefreq: "monthly"}
+  - {url: "/practice/arbitrazhnye-spory/", priority: 0.9, changefreq: "monthly"}
+  - {url: "/practice/semeinye-spory/", priority: 0.9, changefreq: "monthly"}
+  - {url: "/practice/nasledstvennye-spory/", priority: 0.9, changefreq: "monthly"}
+  - {url: "/practice/zashchita-prav-potrebiteley/", priority: 0.9, changefreq: "monthly"}
+  - {url: "/practice/pravovaya-analitika/", priority: 0.8, changefreq: "monthly"}
+  - {url: "/practice/pravovoe-soprovozhdenie-biznesa/", priority: 0.8, changefreq: "monthly"}
+  - {url: "/working-process/", priority: 0.7, changefreq: "yearly"}
+  - {url: "/remuneration/", priority: 0.7, changefreq: "yearly"}
+  - {url: "/documents/", priority: 0.6, changefreq: "yearly"}
+  - {url: "/contacts/", priority: 0.7, changefreq: "yearly"}
+notes:
+  - "404.html не включается в sitemap."
+  - "Политика персональных данных не создаётся шаблонно до определения реальных потоков обработки."
+  - "Правовые материалы и статьи добавляются после подготовки и утверждения конкретных текстов."

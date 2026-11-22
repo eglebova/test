@@ -1,0 +1,27 @@
+# Replace example.ru and root path. Caddy provisions and renews TLS automatically.
+example.ru, www.example.ru {
+    root * /var/www/glebova-site/current
+    encode zstd gzip
+
+    @hidden path_regexp hidden (^|/)\.(git|env|htaccess|htpasswd)(/|$)
+    respond @hidden 404
+    @private path_regexp private \.(md|markdown|ya?ml|toml|ini|log|sql|dump|bak|old|orig|swp|map|env|conf|pem|key|crt|sh|py|zip)$
+    respond @private 404
+
+    try_files {path} {path}/ {path}/index.html
+    file_server {
+        hide .git .env *.md *.yaml *.yml *.toml *.ini *.log *.sql *.dump *.bak *.old *.orig *.swp *.map *.conf *.pem *.key *.crt *.sh *.py *.zip
+    }
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()"
+        Cross-Origin-Opener-Policy "same-origin"
+        Cross-Origin-Resource-Policy "same-origin"
+        Content-Security-Policy "default-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; script-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'none'; frame-src 'none'; media-src 'none'; manifest-src 'self'; upgrade-insecure-requests"
+        # Enable only after HTTPS works for every used subdomain:
+        # Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+}

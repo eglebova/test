@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="t d">
+  <title id="t">Знак правовой практики</title><desc id="d">Стилизованный знак параграфа</desc>
+  <rect x="1" y="1" width="62" height="62" fill="#172b46"/>
+  <path d="M9 10h46M9 54h46" stroke="#b49a70" stroke-width="1"/>
+  <text x="32" y="40" text-anchor="middle" fill="#fff" font-family="Georgia,serif" font-size="34">§</text>
+</svg>

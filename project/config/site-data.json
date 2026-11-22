@@ -1,0 +1,84 @@
+{
+  "site": {
+    "project_name": "Персональный сайт адвоката Глебовой Елены Алексеевны",
+    "locale": "ru-RU",
+    "timezone": "Europe/Moscow",
+    "domain": null,
+    "architecture": "static-html-css",
+    "production_ready": false
+  },
+  "attorney": {
+    "full_name": "Глебова Елена Алексеевна",
+    "status": "Адвокат",
+    "chamber": "Адвокатская палата Московской области",
+    "formation": "Адвокатский кабинет № 376",
+    "registration_number": "50/3910",
+    "activity_start": "2003-06",
+    "education": {
+      "institution": "Московская государственная юридическая академия (МГЮА)",
+      "graduation_year": 2000
+    },
+    "phone": {
+      "display": "+7 (910) 470-76-54",
+      "href": "tel:+79104707654"
+    },
+    "email": {
+      "display": "e_glebova@mail.ru",
+      "href": "mailto:e_glebova@mail.ru"
+    },
+    "public_address": null,
+    "show_map": false,
+    "in_person_reception": false,
+    "criminal_cases": false
+  },
+  "practice_priorities": [
+    {
+      "id": "arbitration",
+      "title": "Арбитражные споры",
+      "url": "/practice/arbitrazhnye-spory/",
+      "priority": 1
+    },
+    {
+      "id": "family",
+      "title": "Семейные споры",
+      "url": "/practice/semeinye-spory/",
+      "priority": 2
+    },
+    {
+      "id": "inheritance",
+      "title": "Наследственные споры",
+      "url": "/practice/nasledstvennye-spory/",
+      "priority": 3
+    },
+    {
+      "id": "consumer",
+      "title": "Защита прав потребителей",
+      "url": "/practice/zashchita-prav-potrebiteley/",
+      "priority": 4
+    }
+  ],
+  "communications": {
+    "default_release": [
+      "phone",
+      "email"
+    ],
+    "contact_form_enabled": false,
+    "file_upload_enabled": false,
+    "chat_enabled": false,
+    "online_payment_enabled": false,
+    "analytics_enabled": false,
+    "cookies_enabled": false
+  },
+  "privacy": {
+    "collect_case_details": false,
+    "collect_documents": false,
+    "no_third_party_tracking": true,
+    "server_log_assessment_required": true
+  },
+  "fees": {
+    "public_price_list": true,
+    "individual_written_agreement_required": true,
+    "automated_acceptance": false,
+    "price_list_note": "Предварительные ориентиры вознаграждения; окончательная сумма индивидуально согласуется в письменном соглашении."
+  }
+}
