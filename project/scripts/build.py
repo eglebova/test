@@ -196,6 +196,15 @@ def main() -> int:
             raw = raw.replace(marker, "")
         raw = raw.replace("__CANONICAL_URL__", canonical)
         raw = localize_html_urls(raw, page, dist)
+        # The distinction between the free organisational call and paid legal advice is visible site-wide.
+        if "</footer>" in raw and "footer-brief-note" not in raw:
+            footer_note = (
+                '<div class="container footer-brief-note"><p><strong>Предварительная беседа — бесплатно.</strong> '
+                'Это короткое организационное обсуждение характера обращения, возможного объёма работы, стоимости и записи; '
+                'без изучения документов и рекомендаций по существу. '
+                '<strong>Юридическая консультация — платная, 3 500 ₽.</strong></p></div>'
+            )
+            raw = raw.replace("</footer>", footer_note + "</footer>", 1)
         # Native disclosure navigation keeps the mobile header compact without JavaScript.
         nav_pattern = re.compile(r'<nav class="primary-nav" aria-label="Основная навигация">.*?</nav>', re.S)
         raw = nav_pattern.sub(lambda match: '<details class="mobile-nav"><summary>Меню</summary>' + match.group(0) + '</details>', raw, count=1)
