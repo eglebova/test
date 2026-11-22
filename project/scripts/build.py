@@ -209,7 +209,7 @@ def main() -> int:
         nav_pattern = re.compile(r'<nav class="primary-nav" aria-label="Основная навигация">.*?</nav>', re.S)
         raw = nav_pattern.sub(lambda match: '<details class="mobile-nav"><summary>Меню</summary>' + match.group(0) + '</details>', raw, count=1)
         # Test builds must not be indexable even if a page template says index,follow.
-        if is_test_origin:
+        if is_test_origin or page.name == "404.html":
             raw = re.sub(r'<meta name="robots" content="[^"]*">', '<meta name="robots" content="noindex,nofollow">', raw, count=1, flags=re.I)
         else:
             raw = re.sub(r'<meta name="robots" content="noindex,nofollow">', '<meta name="robots" content="index,follow">', raw, count=1, flags=re.I)
