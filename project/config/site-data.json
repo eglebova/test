@@ -93,13 +93,13 @@
       "email",
       "max"
     ],
-    "contact_form_enabled": true,
+    "contact_form_enabled": false,
     "file_upload_enabled": false,
     "chat_enabled": false,
     "online_payment_enabled": false,
     "analytics_enabled": false,
     "cookies_enabled": false,
-    "contact_form_type": "mailto_draft",
+    "contact_form_type": "disabled",
     "server_submission": false
   },
   "privacy": {
