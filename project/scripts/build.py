@@ -207,7 +207,7 @@ def add_person_and_service_schema(raw: str, page: Path, dist: Path) -> str:
             '<meta itemprop="jobTitle" content="Адвокат">'
             '<meta itemprop="telephone" content="+79104707654">'
             '<meta itemprop="email" content="e_glebova@mail.ru">'
-            '<meta itemprop="memberOf" content="Адвокатская палата Московской области">',
+            '<span itemprop="memberOf" itemscope itemtype="https://schema.org/Organization"><meta itemprop="name" content="Адвокатская палата Московской области"></span>',
             1
         )
         raw = raw.replace('<h1>Елена Алексеевна Глебова</h1>', '<h1 itemprop="name">Елена Алексеевна Глебова</h1>', 1)
