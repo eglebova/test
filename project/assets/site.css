@@ -489,3 +489,7 @@ img { max-width: 100%; height: auto; }
   .preliminary-section { padding-block:38px; }
   .audience-card { min-height:0; }
 }
+
+.footer-brief-note { padding-block:15px 22px; border-top:1px solid rgba(255,255,255,.16); }
+.footer-brief-note p { max-width:980px; margin:0; color:rgba(255,255,255,.72); font-size:12px; line-height:1.65; }
+.footer-brief-note strong { color:#fff; }
