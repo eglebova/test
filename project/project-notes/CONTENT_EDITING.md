@@ -14,6 +14,9 @@
 | Семейные споры | `practice/semeinye-spory/index.html` |
 | Наследственные споры | `practice/nasledstvennye-spory/index.html` |
 | Защита прав потребителей | `practice/zashchita-prav-potrebiteley/index.html` |
+| Недвижимость и земельные споры | `practice/nedvizhimost-i-zemelnye-spory/index.html` |
+| Трудовые споры | `practice/trudovye-spory/index.html` |
+| Налоговые споры | `practice/nalogovye-spory/index.html` |
 | Правовая аналитика | `practice/pravovaya-analitika/index.html` |
 | Сопровождение бизнеса | `practice/pravovoe-soprovozhdenie-biznesa/index.html` |
 | Порядок работы | `working-process/index.html` |
