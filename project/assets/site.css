@@ -531,8 +531,10 @@ img { max-width: 100%; height: auto; }
 
 
 /* Click-to-open consultation references (CSP-safe, no inline scripts). */
-.consultation-reference{min-width:0;padding:.15rem 0}
-.consultation-footnote{display:inline;color:var(--link,#315d83);font:inherit;font-size:.96rem;line-height:1.55;text-align:left;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;cursor:pointer}
+.consultation-reference{min-width:0;display:flex;align-items:stretch;padding:20px 22px;border:1px solid var(--border);border-radius:10px;background:linear-gradient(145deg,#fff 0%,#fbfaf7 100%);box-shadow:0 5px 18px rgba(23,43,70,.045);transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease}
+.consultation-reference:hover{transform:translateY(-2px);border-color:#c6b18d;box-shadow:0 12px 24px rgba(23,43,70,.075)}
+.consultation-footnote{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;width:100%;color:var(--navy);font:inherit;font-size:.94rem;font-weight:600;line-height:1.58;text-align:left;text-decoration:none;cursor:pointer}
+.consultation-footnote::after{flex:0 0 auto;margin-top:1px;color:var(--gold);content:"↗";font-size:1.1rem;line-height:1.2}
 .consultation-footnote:hover{color:var(--accent,#9a7445)}
 .consultation-footnote:focus-visible,.consultation-modal__close:focus-visible,.consultation-modal__backdrop:focus-visible{outline:2px solid currentColor;outline-offset:4px}
 .consultation-modal{display:none;position:fixed;inset:0;z-index:10000;align-items:center;justify-content:center;padding:24px;background:rgba(12,22,35,.66);backdrop-filter:blur(2px)}
@@ -549,4 +551,4 @@ img { max-width: 100%; height: auto; }
 .consultation-modal__body p{margin:.55rem 0}
 .consultation-modal__body ul,.consultation-modal__body ol{padding-left:1.4rem}
 .consultation-modal__body li{margin:.25rem 0}
-@media(max-width:600px){.consultation-modal{padding:10px}.consultation-modal__window{max-height:calc(100vh - 20px);border-radius:10px}.consultation-modal__header{padding:13px 17px}.consultation-modal__body{padding:16px 18px 22px}}
+@media(max-width:600px){.consultation-reference{padding:16px 18px}.consultation-modal{padding:10px}.consultation-modal__window{max-height:calc(100vh - 20px);border-radius:10px}.consultation-modal__header{padding:13px 17px}.consultation-modal__body{padding:16px 18px 22px}}
