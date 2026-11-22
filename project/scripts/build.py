@@ -136,7 +136,19 @@ def enhance_article(raw: str, page: Path, dist: Path) -> str:
     match = re.search(r'(<article class="article-content">)(.*?)(</article>)', raw, re.S)
     if not match:
         return raw
+    raw = raw.replace(
+        '<article class="article-content">',
+        '<article class="article-content" itemscope itemtype="https://schema.org/Article">',
+        1
+    )
+    match = re.search(r'(<article class="article-content"[^>]*>)(.*?)(</article>)', raw, re.S)
+    if not match:
+        return raw
     body = match.group(2)
+    h1 = re.search(r'<h1[^>]*>(.*?)</h1>', raw, re.S)
+    if h1:
+        headline = unescape(re.sub(r"<[^>]+>", "", h1.group(1))).strip()
+        body = '<meta itemprop="headline" content="' + escape(headline, quote=True) + '">' + body
     heading_pattern = re.compile(r'<h2\b([^>]*)>(.*?)</h2>', re.S)
     headings = list(heading_pattern.finditer(body))
     if len(headings) >= 5 and 'class="article-toc"' not in body:
@@ -162,12 +174,46 @@ def enhance_article(raw: str, page: Path, dist: Path) -> str:
     if 'class="article-author"' not in body:
         about_url = relative_site_url("/about/", page, dist)
         author = (
-            '<aside class="article-author"><p><strong>Автор материала</strong><br>'
-            'Елена Алексеевна Глебова, адвокат Адвокатской палаты Московской области.</p>'
+            '<aside class="article-author" itemprop="author" itemscope itemtype="https://schema.org/Person"><p><strong>Автор материала</strong><br>'
+            '<span itemprop="name">Елена Алексеевна Глебова</span>, <span itemprop="jobTitle">адвокат</span> Адвокатской палаты Московской области.</p>'
             f'<a href="{escape(about_url, quote=True)}">Сведения об адвокате</a></aside>'
         )
         body += author
     return raw[:match.start(2)] + body + raw[match.end(2):]
+
+
+def add_person_and_service_schema(raw: str, page: Path, dist: Path) -> str:
+    """Add Schema.org microdata only where the page content supports it."""
+    rel = page.relative_to(dist).as_posix()
+    if rel == "index.html":
+        raw = raw.replace(
+            '<main id="main">',
+            '<main id="main" itemscope itemtype="https://schema.org/LegalService">'
+            '<meta itemprop="name" content="Адвокатская практика Глебовой Елены Алексеевны">'
+            '<meta itemprop="telephone" content="+79104707654">'
+            '<meta itemprop="email" content="e_glebova@mail.ru">'
+            '<meta itemprop="areaServed" content="Россия">',
+            1
+        )
+        raw = raw.replace(
+            'Я — Елена Алексеевна Глебова, адвокат',
+            'Я — <span itemprop="provider" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Елена Алексеевна Глебова</span><meta itemprop="jobTitle" content="Адвокат"></span>, адвокат',
+            1
+        )
+    elif rel == "about/index.html":
+        raw = raw.replace(
+            '<main id="main">',
+            '<main id="main" itemscope itemtype="https://schema.org/Person">'
+            '<meta itemprop="jobTitle" content="Адвокат">'
+            '<meta itemprop="telephone" content="+79104707654">'
+            '<meta itemprop="email" content="e_glebova@mail.ru">'
+            '<meta itemprop="memberOf" content="Адвокатская палата Московской области">',
+            1
+        )
+        raw = raw.replace('<h1>Елена Алексеевна Глебова</h1>', '<h1 itemprop="name">Елена Алексеевна Глебова</h1>', 1)
+        raw = re.sub(r'(<img class="about-photo"[^>]*)(>)', r'\1 itemprop="image"\2', raw, count=1)
+        raw = raw.replace('<p class="lead">Меня зовут', '<p class="lead" itemprop="description">Меня зовут', 1)
+    return raw
 
 
 def resolve_local(path: str, dist: Path, page: Path) -> bool:
@@ -237,6 +283,7 @@ def main() -> int:
         else:
             raw = raw.replace(marker, "")
         raw = raw.replace("__CANONICAL_URL__", canonical)
+        raw = add_person_and_service_schema(raw, page, dist)
         raw = enhance_article(raw, page, dist)
         raw = localize_html_urls(raw, page, dist)
         # The distinction between the free organisational call and paid legal advice is visible site-wide.
