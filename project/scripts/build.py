@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from datetime import date
 from html.parser import HTMLParser
+from html import escape, unescape
 from pathlib import Path
 from urllib.parse import urlsplit
 import re
@@ -25,6 +26,8 @@ FORBIDDEN = [
     "лучший адвокат", "номер один", "отзывы доверителей", "рейтинг адвоката",
     "уголовные дела", "защита по уголовным делам", "юридическая компания", "юридическая фирма",
     "публичная оферта", "акцепт оферты", "загрузить документы", "прикрепить файл",
+    "бесплатная консультация", "первая консультация бесплатно", "получить бесплатную консультацию",
+    "бесплатный анализ документов", "бесплатная юридическая консультация",
 ]
 
 class PageParser(HTMLParser):
@@ -126,6 +129,93 @@ def localize_html_urls(raw: str, page: Path, dist: Path) -> str:
     return attr.sub(lambda m: m.group("prefix") + m.group("q") + relative_site_url(m.group("url"), page, dist) + m.group("q"), raw)
 
 
+def enhance_article(raw: str, page: Path, dist: Path) -> str:
+    """Add a navigable contents list and a factual author note to long article pages."""
+    if page.parent.parent.name != "articles" or page.parent.name == "articles":
+        return raw
+    match = re.search(r'(<article class="article-content">)(.*?)(</article>)', raw, re.S)
+    if not match:
+        return raw
+    raw = raw.replace(
+        '<article class="article-content">',
+        '<article class="article-content" itemscope itemtype="https://schema.org/Article">',
+        1
+    )
+    match = re.search(r'(<article class="article-content"[^>]*>)(.*?)(</article>)', raw, re.S)
+    if not match:
+        return raw
+    body = match.group(2)
+    h1 = re.search(r'<h1[^>]*>(.*?)</h1>', raw, re.S)
+    if h1:
+        headline = unescape(re.sub(r"<[^>]+>", "", h1.group(1))).strip()
+        body = '<meta itemprop="headline" content="' + escape(headline, quote=True) + '">' + body
+    heading_pattern = re.compile(r'<h2\b([^>]*)>(.*?)</h2>', re.S)
+    headings = list(heading_pattern.finditer(body))
+    if len(headings) >= 5 and 'class="article-toc"' not in body:
+        replacements = []
+        links = []
+        for index, heading in enumerate(headings, 1):
+            attrs, inner = heading.group(1), heading.group(2)
+            existing = re.search(r"\bid=['\"]([^'\"]+)['\"]", attrs)
+            anchor_id = existing.group(1) if existing else f"article-section-{index}"
+            label = unescape(re.sub(r"<[^>]+>", "", inner)).strip()
+            if not existing:
+                replacement = f'<h2{attrs} id="{anchor_id}">{inner}</h2>'
+                replacements.append((heading.start(), heading.end(), replacement))
+            links.append(f'<li><a href="#{escape(anchor_id, quote=True)}">{escape(label)}</a></li>')
+        for start, end, replacement in reversed(replacements):
+            body = body[:start] + replacement + body[end:]
+        toc = '<nav class="article-toc" aria-label="Содержание статьи"><strong>Содержание</strong><ol>' + "".join(links) + '</ol></nav>'
+        meta = re.search(r'(<p class="article-meta">.*?</p>)', body, re.S)
+        if meta:
+            body = body[:meta.end()] + toc + body[meta.end():]
+        else:
+            body = toc + body
+    if 'class="article-author"' not in body:
+        about_url = relative_site_url("/about/", page, dist)
+        author = (
+            '<aside class="article-author" itemprop="author" itemscope itemtype="https://schema.org/Person"><p><strong>Автор материала</strong><br>'
+            '<span itemprop="name">Елена Алексеевна Глебова</span>, <span itemprop="jobTitle">адвокат</span> Адвокатской палаты Московской области.</p>'
+            f'<a href="{escape(about_url, quote=True)}">Сведения об адвокате</a></aside>'
+        )
+        body += author
+    return raw[:match.start(2)] + body + raw[match.end(2):]
+
+
+def add_person_and_service_schema(raw: str, page: Path, dist: Path) -> str:
+    """Add Schema.org microdata only where the page content supports it."""
+    rel = page.relative_to(dist).as_posix()
+    if rel == "index.html":
+        raw = raw.replace(
+            '<main id="main">',
+            '<main id="main" itemscope itemtype="https://schema.org/LegalService">'
+            '<meta itemprop="name" content="Адвокатская практика Глебовой Елены Алексеевны">'
+            '<meta itemprop="telephone" content="+79104707654">'
+            '<meta itemprop="email" content="e_glebova@mail.ru">'
+            '<meta itemprop="areaServed" content="Россия">',
+            1
+        )
+        raw = raw.replace(
+            'Я — Елена Алексеевна Глебова, адвокат',
+            'Я — <span itemprop="provider" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Елена Алексеевна Глебова</span><meta itemprop="jobTitle" content="Адвокат"></span>, адвокат',
+            1
+        )
+    elif rel == "about/index.html":
+        raw = raw.replace(
+            '<main id="main">',
+            '<main id="main" itemscope itemtype="https://schema.org/Person">'
+            '<meta itemprop="jobTitle" content="Адвокат">'
+            '<meta itemprop="telephone" content="+79104707654">'
+            '<meta itemprop="email" content="e_glebova@mail.ru">'
+            '<span itemprop="memberOf" itemscope itemtype="https://schema.org/Organization"><meta itemprop="name" content="Адвокатская палата Московской области"></span>',
+            1
+        )
+        raw = raw.replace('<h1>Елена Алексеевна Глебова</h1>', '<h1 itemprop="name">Елена Алексеевна Глебова</h1>', 1)
+        raw = re.sub(r'(<img class="about-photo"[^>]*)(>)', r'\1 itemprop="image"\2', raw, count=1)
+        raw = raw.replace('<p class="lead">Меня зовут', '<p class="lead" itemprop="description">Меня зовут', 1)
+    return raw
+
+
 def resolve_local(path: str, dist: Path, page: Path) -> bool:
     if not path or path == "#":
         return True
@@ -157,6 +247,8 @@ def main() -> int:
     if any(ch in origin for ch in " <>\"'`"):
         print("FAIL: invalid characters in --origin", file=sys.stderr)
         return 2
+
+    is_test_origin = parsed_origin.hostname in {"localhost", "127.0.0.1", "qa.invalid", "example.invalid"} or (parsed_origin.hostname or "").endswith(".invalid")
 
     dist = Path(args.out).resolve()
     if dist == ROOT or ROOT in dist.parents and dist == ROOT:
@@ -191,7 +283,26 @@ def main() -> int:
         else:
             raw = raw.replace(marker, "")
         raw = raw.replace("__CANONICAL_URL__", canonical)
+        raw = add_person_and_service_schema(raw, page, dist)
+        raw = enhance_article(raw, page, dist)
         raw = localize_html_urls(raw, page, dist)
+        # The distinction between the free organisational call and paid legal advice is visible site-wide.
+        if "</footer>" in raw and "footer-brief-note" not in raw:
+            footer_note = (
+                '<div class="container footer-brief-note"><p><strong>Предварительная беседа — бесплатно.</strong> '
+                'Это короткое организационное обсуждение характера обращения, возможного объёма работы, стоимости и записи; '
+                'без изучения документов и рекомендаций по существу. '
+                '<strong>Юридическая консультация — платная, 3 500 ₽.</strong></p></div>'
+            )
+            raw = raw.replace("</footer>", footer_note + "</footer>", 1)
+        # Native disclosure navigation keeps the mobile header compact without JavaScript.
+        nav_pattern = re.compile(r'<nav class="primary-nav" aria-label="Основная навигация">.*?</nav>', re.S)
+        raw = nav_pattern.sub(lambda match: '<details class="mobile-nav"><summary>Меню</summary>' + match.group(0) + '</details>', raw, count=1)
+        # Test builds must not be indexable even if a page template says index,follow.
+        if is_test_origin or page.name == "404.html":
+            raw = re.sub(r'<meta name="robots" content="[^"]*">', '<meta name="robots" content="noindex,nofollow">', raw, count=1, flags=re.I)
+        else:
+            raw = re.sub(r'<meta name="robots" content="noindex,nofollow">', '<meta name="robots" content="index,follow">', raw, count=1, flags=re.I)
         page.write_text(raw, encoding="utf-8")
 
         parser = PageParser()
@@ -250,7 +361,6 @@ def main() -> int:
             errors.append(f"{file.relative_to(dist).as_posix()}: unresolved template token")
 
     # Do not invite indexing of reserved/test origins used for local QA.
-    is_test_origin = parsed_origin.hostname in {"localhost", "127.0.0.1", "qa.invalid", "example.invalid"} or (parsed_origin.hostname or "").endswith(".invalid")
     if is_test_origin:
         robots_text = "User-agent: *\nDisallow: /\n"
     else:

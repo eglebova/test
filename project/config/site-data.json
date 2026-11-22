@@ -55,19 +55,52 @@
       "title": "Защита прав потребителей",
       "url": "/practice/zashchita-prav-potrebiteley/",
       "priority": 4
+    },
+    {
+      "id": "legal-analytics",
+      "title": "Правовая аналитика",
+      "url": "/practice/pravovaya-analitika/",
+      "priority": 5
+    },
+    {
+      "id": "business",
+      "title": "Правовое сопровождение бизнеса",
+      "url": "/practice/pravovoe-soprovozhdenie-biznesa/",
+      "priority": 6
+    },
+    {
+      "id": "real-estate",
+      "title": "Недвижимость и земельные споры",
+      "url": "/practice/nedvizhimost-i-zemelnye-spory/",
+      "priority": 7
+    },
+    {
+      "id": "employment",
+      "title": "Трудовые споры",
+      "url": "/practice/trudovye-spory/",
+      "priority": 8
+    },
+    {
+      "id": "tax",
+      "title": "Налоговые споры",
+      "url": "/practice/nalogovye-spory/",
+      "priority": 9
     }
   ],
   "communications": {
     "default_release": [
       "phone",
-      "email"
+      "email",
+      "max"
     ],
-    "contact_form_enabled": false,
+    "contact_form_enabled": true,
     "file_upload_enabled": false,
     "chat_enabled": false,
     "online_payment_enabled": false,
     "analytics_enabled": false,
-    "cookies_enabled": false
+    "cookies_enabled": false,
+    "contact_form_type": "mailto_draft",
+    "server_submission": false
   },
   "privacy": {
     "collect_case_details": false,

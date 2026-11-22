@@ -1,20 +1,38 @@
-version: 1
+version: 2
 source: scripts/build.py
 pages:
-  - {url: "/", priority: 1.0, changefreq: "monthly"}
-  - {url: "/about/", priority: 0.8, changefreq: "yearly"}
-  - {url: "/practice/", priority: 0.9, changefreq: "monthly"}
-  - {url: "/practice/arbitrazhnye-spory/", priority: 0.9, changefreq: "monthly"}
-  - {url: "/practice/semeinye-spory/", priority: 0.9, changefreq: "monthly"}
-  - {url: "/practice/nasledstvennye-spory/", priority: 0.9, changefreq: "monthly"}
-  - {url: "/practice/zashchita-prav-potrebiteley/", priority: 0.9, changefreq: "monthly"}
-  - {url: "/practice/pravovaya-analitika/", priority: 0.8, changefreq: "monthly"}
-  - {url: "/practice/pravovoe-soprovozhdenie-biznesa/", priority: 0.8, changefreq: "monthly"}
-  - {url: "/working-process/", priority: 0.7, changefreq: "yearly"}
-  - {url: "/remuneration/", priority: 0.7, changefreq: "yearly"}
-  - {url: "/documents/", priority: 0.6, changefreq: "yearly"}
-  - {url: "/contacts/", priority: 0.7, changefreq: "yearly"}
+  - {url: "/", priority: 1.0}
+  - {url: "/about/", priority: 0.7}
+  - {url: "/articles/", priority: 0.8}
+  - {url: "/articles/building-defects-review-2024-2026/", priority: 0.8}
+  - {url: "/articles/consumer-penalty-damages-2021-2026/", priority: 0.8}
+  - {url: "/articles/konkurenciya-kartel-i-dominiruyushchee-polozhenie/", priority: 0.8}
+  - {url: "/articles/materialnaya-otvetstvennost-rabotodatelya/", priority: 0.8}
+  - {url: "/articles/nalogovye-pozicii-2026/", priority: 0.8}
+  - {url: "/articles/nds-pri-remonte-vozdushnogo-sudna/", priority: 0.8}
+  - {url: "/articles/obzor-vs-3-2026/", priority: 0.8}
+  - {url: "/articles/podgotovka-grazhdanskogo-dela-2026/", priority: 0.8}
+  - {url: "/articles/rukovodyashchie-razyasneniya-vs-2026/", priority: 0.8}
+  - {url: "/articles/sanktsionnye-sdelki-obzor-vs-8-2026/", priority: 0.8}
+  - {url: "/articles/software-development-disputes-2025-2026/", priority: 0.8}
+  - {url: "/articles/vozmeshchenie-poter-406-1-gk/", priority: 0.8}
+  - {url: "/articles/zemelnyy-nalog-izhs-2026/", priority: 0.8}
+  - {url: "/contacts/", priority: 0.7}
+  - {url: "/documents/", priority: 0.7}
+  - {url: "/practice/", priority: 0.9}
+  - {url: "/practice/arbitrazhnye-spory/", priority: 0.9}
+  - {url: "/practice/nalogovye-spory/", priority: 0.9}
+  - {url: "/practice/nasledstvennye-spory/", priority: 0.9}
+  - {url: "/practice/nedvizhimost-i-zemelnye-spory/", priority: 0.9}
+  - {url: "/practice/pravovaya-analitika/", priority: 0.9}
+  - {url: "/practice/pravovoe-soprovozhdenie-biznesa/", priority: 0.9}
+  - {url: "/practice/semeinye-spory/", priority: 0.9}
+  - {url: "/practice/trudovye-spory/", priority: 0.9}
+  - {url: "/practice/zashchita-prav-potrebiteley/", priority: 0.9}
+  - {url: "/remuneration/", priority: 0.7}
+  - {url: "/working-process/", priority: 0.7}
 notes:
-  - "404.html не включается в sitemap."
-  - "Политика персональных данных не создаётся шаблонно до определения реальных потоков обработки."
-  - "Правовые материалы и статьи добавляются после подготовки и утверждения конкретных текстов."
+  - "Build script generates sitemap.xml from the actual public HTML tree; this file is a human-readable route inventory."
+  - "404.html is excluded from sitemap."
+  - "Test origins receive noindex,nofollow and a disallowing robots.txt."
+  - "Production canonical URLs are emitted only after the real HTTPS origin is supplied."
