@@ -25,6 +25,8 @@ FORBIDDEN = [
     "лучший адвокат", "номер один", "отзывы доверителей", "рейтинг адвоката",
     "уголовные дела", "защита по уголовным делам", "юридическая компания", "юридическая фирма",
     "публичная оферта", "акцепт оферты", "загрузить документы", "прикрепить файл",
+    "бесплатная консультация", "первая консультация бесплатно", "получить бесплатную консультацию",
+    "бесплатный анализ документов", "бесплатная юридическая консультация",
 ]
 
 class PageParser(HTMLParser):
@@ -158,6 +160,8 @@ def main() -> int:
         print("FAIL: invalid characters in --origin", file=sys.stderr)
         return 2
 
+    is_test_origin = parsed_origin.hostname in {"localhost", "127.0.0.1", "qa.invalid", "example.invalid"} or (parsed_origin.hostname or "").endswith(".invalid")
+
     dist = Path(args.out).resolve()
     if dist == ROOT or ROOT in dist.parents and dist == ROOT:
         print("FAIL: output directory cannot be project root", file=sys.stderr)
@@ -192,6 +196,14 @@ def main() -> int:
             raw = raw.replace(marker, "")
         raw = raw.replace("__CANONICAL_URL__", canonical)
         raw = localize_html_urls(raw, page, dist)
+        # Native disclosure navigation keeps the mobile header compact without JavaScript.
+        nav_pattern = re.compile(r'<nav class="primary-nav" aria-label="Основная навигация">.*?</nav>', re.S)
+        raw = nav_pattern.sub(lambda match: '<details class="mobile-nav"><summary>Меню</summary>' + match.group(0) + '</details>', raw, count=1)
+        # Test builds must not be indexable even if a page template says index,follow.
+        if is_test_origin:
+            raw = re.sub(r'<meta name="robots" content="[^"]*">', '<meta name="robots" content="noindex,nofollow">', raw, count=1, flags=re.I)
+        else:
+            raw = re.sub(r'<meta name="robots" content="noindex,nofollow">', '<meta name="robots" content="index,follow">', raw, count=1, flags=re.I)
         page.write_text(raw, encoding="utf-8")
 
         parser = PageParser()
@@ -250,7 +262,6 @@ def main() -> int:
             errors.append(f"{file.relative_to(dist).as_posix()}: unresolved template token")
 
     # Do not invite indexing of reserved/test origins used for local QA.
-    is_test_origin = parsed_origin.hostname in {"localhost", "127.0.0.1", "qa.invalid", "example.invalid"} or (parsed_origin.hostname or "").endswith(".invalid")
     if is_test_origin:
         robots_text = "User-agent: *\nDisallow: /\n"
     else:
