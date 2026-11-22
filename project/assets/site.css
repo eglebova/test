@@ -513,23 +513,18 @@ img { max-width: 100%; height: auto; }
 
 
 /* Expandable consultation Q&A cards (native details/summary, no JavaScript). */
-.consultation-faq { display:block; min-height:250px; padding:0; }
-.consultation-faq > summary { display:flex; min-height:250px; flex-direction:column; align-items:flex-start; padding:25px; list-style:none; cursor:pointer; }
+.consultation-faq { display:block; min-height:0; padding:0; }
+.consultation-faq > summary { display:flex; min-height:0; flex-direction:row; align-items:center; gap:18px; padding:25px; list-style:none; cursor:pointer; }
 .consultation-faq > summary::-webkit-details-marker { display:none; }
 .consultation-faq > summary:focus-visible { outline:3px solid #947e59; outline-offset:3px; }
-.consultation-question { display:block; margin:18px 0 20px; color:var(--navy); font-family:var(--serif); font-size:23px; font-weight:500; line-height:1.22; }
-.faq-toggle { display:inline-flex; align-items:center; gap:8px; margin-top:auto; color:var(--navy); font-size:11px; font-weight:800; }
-.faq-toggle::after { color:var(--gold); content:"＋"; font-size:16px; }
-.consultation-faq[open] > summary { min-height:0; border-bottom:1px solid var(--border); }
-.consultation-faq[open] .faq-toggle::after { content:"−"; }
+.consultation-faq > summary::after { flex:0 0 auto; margin-left:auto; color:var(--gold); content:"＋"; font-size:20px; }
+.consultation-faq[open] > summary { border-bottom:1px solid var(--border); }
+.consultation-faq[open] > summary::after { content:"−"; }
+.consultation-question { display:block; margin:0; color:var(--navy); font-family:var(--serif); font-size:21px; font-weight:500; line-height:1.35; white-space:pre-wrap; overflow-wrap:anywhere; }
 .consultation-answer { padding:22px 25px 25px; background:#fff; }
-.faq-answer-label { display:block; margin-bottom:12px; color:#8a785b; font-size:10px; font-weight:800; letter-spacing:.14em; }
-.consultation-answer p { margin:0 0 14px; color:#55616e; font-size:14px; line-height:1.75; }
-.consultation-answer p:last-child { margin-bottom:0; }
-.consultation-answer h3 { margin:20px 0 8px; color:var(--navy); font-family:var(--serif); font-size:21px; font-weight:500; line-height:1.25; }
-.consultation-answer h3:first-of-type { margin-top:0; }
+.consultation-answer-text { color:#55616e; font-size:14px; line-height:1.75; white-space:pre-wrap; overflow-wrap:anywhere; }
 @media (max-width:560px) {
-  .consultation-faq > summary { min-height:210px; padding:21px; }
+  .consultation-faq > summary { padding:21px; }
   .consultation-answer { padding:19px 21px 22px; }
-  .consultation-question { font-size:21px; }
+  .consultation-question { font-size:19px; }
 }
