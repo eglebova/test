@@ -251,10 +251,20 @@ def main() -> int:
     is_test_origin = parsed_origin.hostname in {"localhost", "127.0.0.1", "qa.invalid", "example.invalid"} or (parsed_origin.hostname or "").endswith(".invalid")
 
     dist = Path(args.out).resolve()
-    if dist == ROOT or ROOT in dist.parents and dist == ROOT:
-        print("FAIL: output directory cannot be project root", file=sys.stderr)
+    # Never allow the output path to replace the project or overlap a source
+    # directory. This prevents a typo in --out from deleting source material.
+    if dist == ROOT or dist in ROOT.parents:
+        print("FAIL: output directory cannot be the project root or one of its parents", file=sys.stderr)
         return 2
+    protected_sources = [(ROOT / item).resolve() for item in PUBLIC_ITEMS]
+    for source in protected_sources:
+        if dist == source or dist in source.parents or source in dist.parents:
+            print(f"FAIL: output directory overlaps a public source path: {source.relative_to(ROOT) if source.is_relative_to(ROOT) else source}", file=sys.stderr)
+            return 2
     if dist.exists():
+        if not dist.is_dir():
+            print("FAIL: output path exists and is not a directory", file=sys.stderr)
+            return 2
         shutil.rmtree(dist)
     dist.mkdir(parents=True)
 
@@ -372,10 +382,10 @@ def main() -> int:
         if 'name="robots" content="noindex' in page_text:
             continue
         path = url_for_page(dist, page)
-        urls.append((origin + path, date.today().isoformat()))
+        urls.append(origin + path)
     sitemap = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    for loc, lastmod in urls:
-        sitemap.append(f'  <url><loc>{loc}</loc><lastmod>{lastmod}</lastmod></url>')
+    for loc in urls:
+        sitemap.append(f'  <url><loc>{loc}</loc></url>')
     sitemap.append('</urlset>')
     (dist / "sitemap.xml").write_text("\n".join(sitemap) + "\n", encoding="utf-8")
 
