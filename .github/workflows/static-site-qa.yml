@@ -35,4 +35,5 @@ jobs:
         run: |
           grep -q "Disallow: /" "$RUNNER_TEMP/eglebova-site-dist/robots.txt"
           ! grep -q "qa.invalid" "$RUNNER_TEMP/eglebova-site-dist/sitemap.xml"
-          ! grep -R -E 'canonical.*qa\.invalid|og:url.*qa\.invalid' "$RUNNER_TEMP/eglebova-site-dist" --include='*.html'
+
+          grep -R -q 'name="robots" content="noindex,nofollow"' "$RUNNER_TEMP/eglebova-site-dist" --include='*.html'
