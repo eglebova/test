@@ -631,7 +631,7 @@ img { max-width: 100%; height: auto; }
   letter-spacing: .045em;
 }
 .price-table tbody tr:last-child td { border-bottom: 0; }
-.price-table tbody tr:not(:has(th)):nth-child(even) { background: #fbfaf7; }
+.price-table tbody tr:nth-child(even) td { background: #fbfaf7; }
 .price-table td:last-child {
   width: 190px;
   color: var(--navy);
