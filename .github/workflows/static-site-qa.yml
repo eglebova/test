@@ -83,8 +83,8 @@ jobs:
           ):
               if phrase not in html:
                   raise SystemExit(f"Missing required fee wording: {phrase}")
-          main = re.search(r"<main\\b.*?</main>", html, flags=re.S).group(0)
-          main = re.sub(r"<nav\\b.*?</nav>", "", main, flags=re.S)
+          main = html.split('<main id="main">', 1)[1].split("</main>", 1)[0]
+          main = re.sub(r"<nav.*?</nav>", "", main, flags=re.S)
           pronouns = re.compile(
               r"(?<![A-Za-zА-Яа-яЁё])(?:я|мне|мой|моя|моё|мои|моего|моей|мою|моим|мною)(?![A-Za-zА-Яа-яЁё])",
               flags=re.I,
