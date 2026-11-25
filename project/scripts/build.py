@@ -363,6 +363,13 @@ def main() -> int:
             errors.append(f"{rel}: viewport meta is missing")
         if parser.h1_count != 1:
             errors.append(f"{rel}: expected exactly one h1, found {parser.h1_count}")
+        if rel == "remuneration/index.html":
+            if "Ознакомительная консультация по телефону" not in raw or "бесплатно" not in raw:
+                errors.append(f"{rel}: free introductory phone consultation wording is missing")
+            if "Развёрнутая консультация (до 1 часа)" not in raw or "3 500 ₽" not in raw:
+                errors.append(f"{rel}: paid consultation wording or fee is missing")
+            if re.search(r"(?<![А-Яа-яЁё])Я(?=[\\s,.:—])", raw):
+                errors.append(f"{rel}: first-person pronoun remains in the fee page")
         if parser.form_count:
             errors.append(f"{rel}: HTML forms are disabled in this release")
         if parser.iframe_count:
