@@ -1,0 +1,50 @@
+name: Package verified main snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/package-verified-main.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main including the temporary packaging workflow
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Package the immediately preceding main commit
+        run: |
+          set -euo pipefail
+          SNAPSHOT="$(git rev-parse HEAD^)"
+          echo "Snapshot commit: $SNAPSHOT"
+          test "$SNAPSHOT" = "c8422652b80eb08b72554a098f0b806d76ed27b2"
+          git archive --format=zip --prefix=eglebova-test/ --output="$RUNNER_TEMP/eglebova-test-main-c842265.zip" "$SNAPSHOT"
+          unzip -t "$RUNNER_TEMP/eglebova-test-main-c842265.zip"
+          unzip -l "$RUNNER_TEMP/eglebova-test-main-c842265.zip" | tail -n 5
+          sha256sum "$RUNNER_TEMP/eglebova-test-main-c842265.zip"
+
+      - name: Upload full source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: eg lebova-test-main-c842265
+          path: ${{ runner.temp }}/eglebova-test-main-c842265.zip
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Remove temporary packaging workflow from main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          BLOB_SHA="$(git rev-parse HEAD:.github/workflows/package-verified-main.yml)"
+          gh api --method DELETE "repos/$GH_REPO/contents/.github/workflows/package-verified-main.yml" \
+            -f message="Remove one-time verified archive workflow" \
+            -f sha="$BLOB_SHA" \
+            -f branch=main
