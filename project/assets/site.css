@@ -662,3 +662,14 @@ img { max-width: 100%; height: auto; }
 @media (prefers-reduced-motion: reduce) {
   .site-header, .preliminary-box, .price-table-wrap { scroll-behavior: auto; }
 }
+
+
+.credentials-links { margin: 16px 0 0; }
+.credentials-links a {
+  color: var(--navy);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+  text-underline-offset: 3px;
+}
+.credentials-links a:hover { color: var(--navy-2); }
