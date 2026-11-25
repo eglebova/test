@@ -6,15 +6,43 @@ on:
     paths:
       - "project/**"
       - ".github/workflows/static-site-qa.yml"
+      - ".htaccess"
+      - "404.html"
+      - "about/**"
+      - "articles/**"
+      - "assets/**"
+      - "contacts/**"
+      - "documents/**"
+      - "favicon.svg"
+      - "index.html"
+      - "practice/**"
+      - "remuneration/**"
+      - "robots.txt"
+      - "sitemap.xml"
+      - "working-process/**"
   pull_request:
     branches: [main]
     paths:
       - "project/**"
       - ".github/workflows/static-site-qa.yml"
+      - ".htaccess"
+      - "404.html"
+      - "about/**"
+      - "articles/**"
+      - "assets/**"
+      - "contacts/**"
+      - "documents/**"
+      - "favicon.svg"
+      - "index.html"
+      - "practice/**"
+      - "remuneration/**"
+      - "robots.txt"
+      - "sitemap.xml"
+      - "working-process/**"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-and-check:
@@ -35,5 +63,68 @@ jobs:
         run: |
           grep -q "Disallow: /" "$RUNNER_TEMP/eglebova-site-dist/robots.txt"
           ! grep -q "qa.invalid" "$RUNNER_TEMP/eglebova-site-dist/sitemap.xml"
-
           grep -R -q 'name="robots" content="noindex,nofollow"' "$RUNNER_TEMP/eglebova-site-dist" --include='*.html'
+      - name: Verify consultation wording and nominal fee copy
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import re
+
+          page = Path("$RUNNER_TEMP/eglebova-site-dist/remuneration/index.html")
+          html = page.read_text(encoding="utf-8")
+          for phrase in (
+              "Ознакомительная консультация по телефону",
+              "бесплатно",
+              "Развёрнутая консультация (до 1 часа)",
+              "3 500 ₽",
+          ):
+              if phrase not in html:
+                  raise SystemExit(f"Missing required fee wording: {phrase}")
+          if re.search(r"(?<![А-Яа-яЁё])Я(?=[\\s,.:—])", html):
+              raise SystemExit("First-person pronoun remains on the fee page")
+          for phrase in ("Я провожу", "Я консультирую", "Я готовлю", "Я представляю", "Моё вознаграждение"):
+              if phrase in html:
+                  raise SystemExit(f"First-person fee wording remains: {phrase}")
+          print("PASS: exact consultation names, free/paid status, price and neutral fee copy")
+          PY
+      - name: Sync verified preview into repository root
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          SITE_DIST: ${{ runner.temp }}/eglebova-site-dist
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from shutil import copy2
+          import os
+
+          root = Path.cwd()
+          dist = Path(os.environ["SITE_DIST"])
+          excluded = {".git", ".github", "project", "README.txt", "PROMPT.txt"}
+          expected = {p.relative_to(dist) for p in dist.rglob("*") if p.is_file()}
+          existing = {
+              p.relative_to(root)
+              for p in root.rglob("*")
+              if p.is_file() and not any(part in excluded for part in p.relative_to(root).parts)
+          }
+          if existing != expected:
+              missing = sorted(str(p) for p in expected - existing)
+              extra = sorted(str(p) for p in existing - expected)
+              raise SystemExit(f"Root preview file set differs. Missing={missing}; extra={extra}")
+          for rel in sorted(expected):
+              target = root / rel
+              target.parent.mkdir(parents=True, exist_ok=True)
+              copy2(dist / rel, target)
+              if target.read_bytes() != (dist / rel).read_bytes():
+                  raise SystemExit(f"Root preview does not match generated build: {rel}")
+          print(f"PASS: synchronized {len(expected)} generated files into repository root")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all -- .htaccess 404.html about articles assets contacts documents favicon.svg index.html practice remuneration robots.txt sitemap.xml working-process
+          if git diff --cached --quiet; then
+            echo "Root preview is already synchronized."
+          else
+            git commit -m "Sync root website preview from project sources"
+            git push origin HEAD:main
+          fi
