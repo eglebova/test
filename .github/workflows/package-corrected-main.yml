@@ -1,0 +1,63 @@
+name: Package corrected main snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/package-corrected-main.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Build and package the verified snapshot
+        run: |
+          set -euo pipefail
+          SNAPSHOT="$(git rev-parse HEAD^)"
+          test "$SNAPSHOT" = "0c25d9918c9f0bbd6a0f644c69fbee21e0482ee5"
+          git archive --format=zip --prefix=eglebova-test/ --output="$RUNNER_TEMP/eglebova-test-main-0c25d991.zip" "$SNAPSHOT"
+
+          python3 project/scripts/build.py \
+            --origin https://qa.invalid \
+            --out "$RUNNER_TEMP/eglebova-site-preview"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          import os
+
+          source = Path(os.environ["RUNNER_TEMP"]) / "eglebova-site-preview"
+          target = Path(os.environ["RUNNER_TEMP"]) / "eglebova-site-preview-qa-0c25d991.zip"
+          with ZipFile(target, "w", compression=ZIP_DEFLATED, compresslevel=9) as archive:
+              for path in sorted(source.rglob("*")):
+                  if path.is_file():
+                      archive.write(path, path.relative_to(source).as_posix())
+          print(f"Site files: {sum(p.is_file() for p in source.rglob('*'))}")
+          PY
+
+          unzip -t "$RUNNER_TEMP/eglebova-test-main-0c25d991.zip"
+          unzip -t "$RUNNER_TEMP/eglebova-site-preview-qa-0c25d991.zip"
+          sha256sum "$RUNNER_TEMP/eglebova-test-main-0c25d991.zip" "$RUNNER_TEMP/eglebova-site-preview-qa-0c25d991.zip"
+
+      - name: Upload full repository
+        uses: actions/upload-artifact@v4
+        with:
+          name: eglebova-test-main-0c25d991
+          path: ${{ runner.temp }}/eglebova-test-main-0c25d991.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload generated site preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: eglebova-site-preview-qa-0c25d991
+          path: ${{ runner.temp }}/eglebova-site-preview-qa-0c25d991.zip
+          if-no-files-found: error
+          retention-days: 7
