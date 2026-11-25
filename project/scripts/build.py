@@ -11,6 +11,7 @@ import re
 import posixpath
 import shutil
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_ITEMS = [
@@ -93,6 +94,64 @@ class PageParser(HTMLParser):
         if tag == "title":
             self._in_title = False
             self.has_title = True
+
+
+def polish_editorial_copy(raw: str, page: Path) -> str:
+    """Normalize first-person marketing copy into neutral professional language."""
+    replacements = [
+        ("Я представляю доверителей в судах и помогаю гражданам и организациям решать сложные правовые вопросы.",
+         "Представительство доверителей в судах и правовая помощь гражданам и организациям по сложным правовым вопросам."),
+        ("Я — Елена Алексеевна Глебова, адвокат", "Елена Алексеевна Глебова — адвокат"),
+        ("Я, адвокат Глебова Елена Алексеевна, оказываю правовую помощь",
+         "Адвокат Глебова Елена Алексеевна оказывает правовую помощь"),
+        ("Я принимаю первичные обращения", "Первичные обращения принимаются"),
+        ("Я прошу не направлять", "Не следует направлять"),
+        ("Я отдельно согласую", "Безопасный способ передачи материалов согласуется отдельно"),
+        ("Я отдельно согласую с вами", "Безопасный способ передачи материалов согласуется отдельно"),
+        ("Я предлагаю сначала обозначить", "Для начала достаточно обозначить"),
+        ("Я осуществляю профессиональную деятельность", "Профессиональная деятельность осуществляется"),
+        ("Я провожу консультации, анализирую документы и готовлю правовые материалы",
+         "Форматы правовой помощи включают консультации, анализ документов и подготовку правовых материалов"),
+        ("Я работаю дистанционно", "Правовая помощь оказывается дистанционно"),
+        ("Я работаю как адвокат в индивидуальной практике", "Адвокатская деятельность осуществляется в индивидуальной практике"),
+        ("Я готовлю материалы", "Подготовка материалов включает"),
+        ("Я разбираю актуальную", "Анализ актуальной"),
+        ("Я разбираю правовые вопросы", "Анализ правовых вопросов"),
+        ("Я веду экономические и договорные споры", "Представительство по экономическим и договорным спорам"),
+        ("Я представляю доверителей", "Представительство доверителей"),
+        ("Я помогаю гражданам и бизнесу", "Правовая помощь гражданам и бизнесу"),
+        ("Я помогаю", "Правовая помощь включает"),
+        ("Я анализирую", "Анализ"),
+        ("Я готовлю", "Подготовка"),
+        ("Я проверяю", "Проверка"),
+        ("Я определяю", "Определение"),
+        ("Я формирую", "Формирование"),
+        ("Я сопровождаю", "Сопровождение"),
+        ("Я обсуждаю", "Обсуждение"),
+        ("Я принимаю", "Приём"),
+        ("Я согласую", "Согласование"),
+        ("Я прошу", "Просьба"),
+        ("Я добавила", "Для связи предусмотрен"),
+        ("Позвонить мне", "Позвонить"),
+        ("Написать мне", "Написать"),
+        ("Связаться со мной", "Контакты"),
+        ("Обсудить со мной правовой вопрос", "Обсудить правовой вопрос"),
+        ("Моя практика", "Направления помощи"),
+        ("Мои материалы", "Публикации"),
+        ("Мои контакты", "Контакты"),
+        ("Как я работаю", "Порядок работы"),
+        ("Все мои правовые материалы", "Все правовые материалы"),
+        ("Посмотреть ориентиры моего вознаграждения", "Ориентиры вознаграждения"),
+        ("Позвонить ·", "Телефон ·"),
+    ]
+    for old, new in replacements:
+        raw = raw.replace(old, new)
+    # The preliminary call is organisational, free and not a legal consultation.
+    raw = raw.replace(
+        "Ознакомительная консультация по телефону помогает определить",
+        "Ознакомительная консультация по телефону позволяет определить"
+    )
+    return raw
 
 
 def collect_html_files(folder: Path) -> list[Path]:
@@ -250,23 +309,23 @@ def main() -> int:
 
     is_test_origin = parsed_origin.hostname in {"localhost", "127.0.0.1", "qa.invalid", "example.invalid"} or (parsed_origin.hostname or "").endswith(".invalid")
 
-    dist = Path(args.out).resolve()
+    requested_dist = Path(args.out).resolve()
     # Never allow the output path to replace the project or overlap a source
-    # directory. This prevents a typo in --out from deleting source material.
-    if dist == ROOT or dist in ROOT.parents:
+    # directory. All work is staged beside the destination and published only
+    # after every validation succeeds; a failed build preserves the last good release.
+    if requested_dist == ROOT or requested_dist in ROOT.parents:
         print("FAIL: output directory cannot be the project root or one of its parents", file=sys.stderr)
         return 2
     protected_sources = [(ROOT / item).resolve() for item in PUBLIC_ITEMS]
     for source in protected_sources:
-        if dist == source or dist in source.parents or source in dist.parents:
+        if requested_dist == source or requested_dist in source.parents or source in requested_dist.parents:
             print(f"FAIL: output directory overlaps a public source path: {source.relative_to(ROOT) if source.is_relative_to(ROOT) else source}", file=sys.stderr)
             return 2
-    if dist.exists():
-        if not dist.is_dir():
-            print("FAIL: output path exists and is not a directory", file=sys.stderr)
-            return 2
-        shutil.rmtree(dist)
-    dist.mkdir(parents=True)
+    if requested_dist.exists() and not requested_dist.is_dir():
+        print("FAIL: output path exists and is not a directory", file=sys.stderr)
+        return 2
+    stage = Path(tempfile.mkdtemp(prefix=requested_dist.name + ".staging-", dir=str(requested_dist.parent)))
+    dist = stage
 
     for item in PUBLIC_ITEMS:
         src = ROOT / item
@@ -284,6 +343,7 @@ def main() -> int:
     checked_links = 0
     for page in html_files:
         raw = page.read_text(encoding="utf-8")
+        raw = polish_editorial_copy(raw, page)
         public_path = url_for_page(dist, page)
         canonical = origin + public_path
         marker = '  <!-- canonical and og:url are injected by scripts/build.py after the domain is selected -->'
@@ -397,11 +457,26 @@ def main() -> int:
         print(f"FAIL: {len(errors)} issue(s)")
         for e in errors:
             print(" -", e)
+        shutil.rmtree(stage, ignore_errors=True)
         return 1
-    print("PASS: static build created")
+    backup = requested_dist.with_name(requested_dist.name + ".previous")
+    if backup.exists():
+        if backup.is_dir():
+            shutil.rmtree(backup)
+        else:
+            backup.unlink()
+    if requested_dist.exists():
+        requested_dist.replace(backup)
+    stage.replace(requested_dist)
+    if backup.exists():
+        if backup.is_dir():
+            shutil.rmtree(backup)
+        else:
+            backup.unlink()
+    print("PASS: static build created and atomically published")
     print(f"Pages: {len(html_files)} | Internal links checked: {checked_links} | Canonical origin: {origin}")
     print("Static release: no server-side form processing, uploads, analytics, cookies, external assets or contact form.")
-    print(f"Output: {dist}")
+    print(f"Output: {requested_dist}")
     return 0
 
 if __name__ == "__main__":
