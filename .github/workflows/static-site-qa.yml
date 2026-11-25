@@ -65,13 +65,15 @@ jobs:
           ! grep -q "qa.invalid" "$RUNNER_TEMP/eglebova-site-dist/sitemap.xml"
           grep -R -q 'name="robots" content="noindex,nofollow"' "$RUNNER_TEMP/eglebova-site-dist" --include='*.html'
       - name: Verify consultation wording and nominal fee copy
+        env:
+          SITE_DIST: ${{ runner.temp }}/eglebova-site-dist
         run: |
           python3 - <<'PY'
-          from html.parser import HTMLParser
           from pathlib import Path
           import re
+          import os
 
-          page = Path("$RUNNER_TEMP/eglebova-site-dist/remuneration/index.html")
+          page = Path(os.environ["SITE_DIST"]) / "remuneration/index.html"
           html = page.read_text(encoding="utf-8")
           for phrase in (
               "Ознакомительная консультация по телефону",
@@ -81,12 +83,18 @@ jobs:
           ):
               if phrase not in html:
                   raise SystemExit(f"Missing required fee wording: {phrase}")
-          if re.search(r"(?<![А-Яа-яЁё])Я(?=[\\s,.:—])", html):
-              raise SystemExit("First-person pronoun remains on the fee page")
-          for phrase in ("Я провожу", "Я консультирую", "Я готовлю", "Я представляю", "Моё вознаграждение"):
-              if phrase in html:
-                  raise SystemExit(f"First-person fee wording remains: {phrase}")
-          print("PASS: exact consultation names, free/paid status, price and neutral fee copy")
+          main = re.search(r"<main\\b.*?</main>", html, flags=re.S).group(0)
+          main = re.sub(r"<nav\\b.*?</nav>", "", main, flags=re.S)
+          pronouns = re.compile(
+              r"(?<![A-Za-zА-Яа-яЁё])(?:я|мне|мой|моя|моё|мои|моего|моей|мою|моим|мною)(?![A-Za-zА-Яа-яЁё])",
+              flags=re.I,
+          )
+          if pronouns.search(re.sub(r"<[^>]+>", " ", main)):
+              raise SystemExit("First-person wording remains on the fee page")
+          table = re.search(r'<table class="price-table">(.*?)</table>', html, flags=re.S).group(1)
+          if len(re.findall(r"<tr>", table)) != 25:
+              raise SystemExit("The agreed 20 price items and 5 category rows changed")
+          print("PASS: exact consultation names, free/paid status, price, 20 unchanged price items and neutral wording")
           PY
       - name: Sync verified preview into repository root
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
