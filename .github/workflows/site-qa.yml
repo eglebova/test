@@ -1,0 +1,32 @@
+name: Static site quality checks
+
+on:
+  push:
+    paths:
+      - "project/**"
+      - ".github/workflows/site-qa.yml"
+  pull_request:
+    paths:
+      - "project/**"
+      - ".github/workflows/site-qa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile build script
+        working-directory: project
+        run: python -m py_compile scripts/build.py
+      - name: Build and validate static site
+        working-directory: project
+        run: python scripts/build.py --origin https://qa.invalid --out "$RUNNER_TEMP/site-build"
