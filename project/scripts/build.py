@@ -299,10 +299,10 @@ def main() -> int:
         # The distinction between the free organisational call and paid legal advice is visible site-wide.
         if "</footer>" in raw and "footer-brief-note" not in raw:
             footer_note = (
-                '<div class="container footer-brief-note"><p><strong>Предварительная беседа — бесплатно.</strong> '
-                'Это короткое организационное обсуждение характера обращения, возможного объёма работы, стоимости и записи; '
+                '<div class="container footer-brief-note"><p><strong>Ознакомительная консультация по телефону — бесплатно.</strong> '
+                'Это краткое организационное обсуждение общей категории обращения, возможного объёма правовой помощи, стоимости и записи; '
                 'без изучения документов и рекомендаций по существу. '
-                '<strong>Юридическая консультация — платная, 3 500 ₽.</strong></p></div>'
+                '<strong>Развёрнутая консультация (до 1 часа) — 3 500 ₽.</strong></p></div>'
             )
             raw = raw.replace("</footer>", footer_note + "</footer>", 1)
         # Native disclosure navigation keeps the mobile header compact without JavaScript.
@@ -400,7 +400,7 @@ def main() -> int:
         return 1
     print("PASS: static build created")
     print(f"Pages: {len(html_files)} | Internal links checked: {checked_links} | Canonical origin: {origin}")
-    print("Static release: no server-side form processing, uploads, analytics, cookies or external assets. Contact form only prepares a local mailto draft.")
+    print("Static release: no server-side form processing, uploads, analytics, cookies, external assets or contact form.")
     print(f"Output: {dist}")
     return 0
 
