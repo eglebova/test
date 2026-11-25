@@ -228,7 +228,7 @@ def add_person_and_service_schema(raw: str, page: Path, dist: Path) -> str:
         )
         raw = raw.replace(
             'Я — Елена Алексеевна Глебова, адвокат',
-            'Я — <span itemprop="provider" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Елена Алексеевна Глебова</span><meta itemprop="jobTitle" content="Адвокат"></span>, адвокат',
+            '<span itemprop="provider" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Елена Алексеевна Глебова</span><meta itemprop="jobTitle" content="Адвокат"></span> — адвокат',
             1
         )
     elif rel == "about/index.html":
@@ -296,6 +296,7 @@ def main() -> int:
     if requested_dist.exists() and not requested_dist.is_dir():
         print("FAIL: output path exists and is not a directory", file=sys.stderr)
         return 2
+    requested_dist.parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=requested_dist.name + ".staging-", dir=str(requested_dist.parent)))
     dist = stage
 
@@ -340,6 +341,8 @@ def main() -> int:
         # Native disclosure navigation keeps the mobile header compact without JavaScript.
         nav_pattern = re.compile(r'<nav class="primary-nav" aria-label="Основная навигация">.*?</nav>', re.S)
         raw = nav_pattern.sub(lambda match: '<details class="mobile-nav"><summary>Меню</summary>' + match.group(0) + '</details>', raw, count=1)
+        if "consumer-penalty-damages-2021-2026" in page.as_posix():
+            raw = re.sub(r'<meta name="robots" content="[^"]*">', '<meta name="robots" content="noindex,follow">', raw, count=1, flags=re.I)
         # Test builds must not be indexable even if a page template says index,follow.
         if is_test_origin or page.name == "404.html":
             raw = re.sub(r'<meta name="robots" content="[^"]*">', '<meta name="robots" content="noindex,nofollow">', raw, count=1, flags=re.I)
