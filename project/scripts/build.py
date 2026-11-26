@@ -15,8 +15,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_ITEMS = [
-    "index.html", "404.html", "favicon.svg", "robots.txt", ".htaccess",
-    "assets", "about", "practice", "working-process", "remuneration", "documents", "contacts", "articles",
+    "index.html", "404.html", "favicon.svg", "robots.txt",
+    "assets", "about", "practice", "working-process", "remuneration", "documents", "contacts", "articles", "privacy-policy",
 ]
 FORBIDDEN = [
     "адрес офиса", "адрес адвокатского кабинета", "пресненский",
@@ -28,6 +28,7 @@ FORBIDDEN = [
     "уголовные дела", "защита по уголовным делам", "юридическая компания", "юридическая фирма",
     "публичная оферта", "акцепт оферты", "загрузить документы", "прикрепить файл",
     "бесплатная консультация", "первая консультация бесплатно", "получить бесплатную консультацию",
+    "ознакомительная консультация по телефону",
     "бесплатный анализ документов", "бесплатная юридическая консультация",
 ]
 
@@ -96,33 +97,203 @@ class PageParser(HTMLParser):
             self.has_title = True
 
 
+def _mask_editorial_blocks(raw: str, page: Path) -> tuple[str, list[str]]:
+    """Temporarily protect legal examples, answers and long-form article bodies."""
+    ranges: list[tuple[int, int]] = []
+
+    def find_ranges(tag: str, class_name: str) -> None:
+        opener = re.compile(
+            rf'<{tag}\b[^>]*\bclass=["\'][^"\']*\b{re.escape(class_name)}\b[^"\']*["\'][^>]*>',
+            re.I,
+        )
+        token = re.compile(rf'</?{tag}\b[^>]*>', re.I)
+        for opening in opener.finditer(raw):
+            depth = 0
+            for match in token.finditer(raw, opening.start()):
+                value = match.group(0)
+                if value.lower().startswith(f'</{tag}'):
+                    depth -= 1
+                elif not value.rstrip().endswith('/>'):
+                    depth += 1
+                if depth == 0:
+                    ranges.append((opening.start(), match.end()))
+                    break
+
+    find_ranges("details", "consultation-disclosure")
+    find_ranges("div", "consultation-modal")
+    if page.parent.parent.name == "articles" and page.parent.name != "articles":
+        find_ranges("article", "article-content")
+
+    # Merge overlapping ranges so nested protected blocks are restored only once.
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(ranges):
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+
+    protected: list[str] = []
+    for index, (start, end) in reversed(list(enumerate(merged))):
+        marker = f"__LEGAL_CONTENT_PRESERVED_{index}__"
+        protected.append((marker, raw[start:end]))
+        raw = raw[:start] + marker + raw[end:]
+    protected.reverse()
+    return raw, protected
+
+
 def polish_editorial_copy(raw: str, page: Path) -> str:
-    """Replace first-person promotional wording with neutral professional language."""
+    """Keep the attorney's first-person voice while removing the explicit 'I' pronoun."""
+    raw, protected = _mask_editorial_blocks(raw, page)
+
+    # Remove the narrow information strip and the redundant subtitle under the name.
+    raw = re.sub(
+        r'<div class="topline">\s*<div class="container topline-inner">[\s\S]*?</div>\s*</div>\s*',
+        '',
+        raw,
+        flags=re.I,
+    )
+    header_start = raw.find("<header")
+    header_end = raw.find("</header>", header_start)
+    if header_start >= 0 and header_end > header_start:
+        header = raw[header_start:header_end]
+        header = re.sub(
+            r'(<span class="brand-text"><strong>[^<]*</strong>)\s*<small>[^<]*</small>',
+            r'\1',
+            header,
+            count=1,
+        )
+        header = re.sub(
+            r'<a class="nav-link" href="[^"]+"(?: aria-current="page")?>Главная</a>',
+            '',
+            header,
+            count=1,
+        )
+        raw = raw[:header_start] + header + raw[header_end:]
+
     replacements = [
-        ("Я представляю доверителей в судах и помогаю гражданам и организациям решать сложные правовые вопросы.",
-         "Представительство доверителей в судах и правовая помощь гражданам и организациям по сложным правовым вопросам."),
-        ("Я — Елена Алексеевна Глебова, адвокат", "Адвокат Елена Алексеевна Глебова"),
+        ("Я, адвокат Глебова Елена Алексеевна, оказываю правовую помощь гражданам и организациям, представляю доверителей в судах и анализирую сложные правовые вопросы.",
+         "Оказываю правовую помощь гражданам и организациям, представляю доверителей в судах и анализирую сложные правовые вопросы."),
+        ('content="Я, адвокат Глебова Елена Алексеевна, оказываю правовую помощь',
+         'content="Оказываю правовую помощь'),
+        ("Я — адвокат Адвокатской палаты Московской области.",
+         "Осуществляю адвокатскую деятельность в Адвокатской палате Московской области."),
+        ("Меня зовут Елена Алексеевна Глебова. Я — адвокат Адвокатской палаты Московской области. Представляю доверителей в судах, провожу правовую аналитику, проверяю договоры и готовлю правовые позиции.",
+         "Осуществляю адвокатскую деятельность в Адвокатской палате Московской области. Представляю доверителей в судах."),
         ("Я, адвокат Глебова Елена Алексеевна, оказываю правовую помощь",
-         "Адвокат Глебова Елена Алексеевна оказывает правовую помощь"),
+         "Оказываю правовую помощь"),
+        ("Юридическая помощь по семейным делам: расторжение брака, раздел имущества, алименты, споры о детях и представляю доверителя в суде.",
+         "Правовая помощь по семейным спорам: расторжение брака, раздел имущества, алименты и споры о детях. Представительство в суде."),
+        ("Юридическая помощь потребителям: недостатки товаров и услуг, возврат денежных средств, претензии и представляю доверителя в суде.",
+         "Правовая помощь потребителям по спорам о недостатках товаров и услуг, возврате денежных средств и претензиям. Представительство в суде."),
+        ("Я прошу не направлять мне в первом сообщении подробности дела и документы.",
+         "В первом сообщении достаточно обозначить общую категорию вопроса; подробности дела и документы передаются после согласования безопасного способа связи."),
         ("Я отдельно согласую безопасный способ передачи материалов.",
          "Безопасный способ передачи материалов согласуется отдельно."),
-        ("Я прошу не направлять мне в первом сообщении подробности дела и документы.",
-         "В первом сообщении не следует направлять подробности дела и документы."),
+        ("Я отдельно согласую с вами безопасный способ передачи материалов.",
+         "Безопасный способ передачи материалов согласуется отдельно."),
         ("Я предлагаю сначала обозначить общую категорию правового вопроса",
          "Для начала достаточно обозначить общую категорию правового вопроса"),
+        ("Я представляю доверителей в судах и помогаю гражданам и организациям решать сложные правовые вопросы.",
+         "Представляю доверителей в судах и помогаю гражданам и организациям решать сложные правовые вопросы."),
         ("Позвонить мне", "Позвонить"),
         ("Написать мне", "Написать"),
         ("Связаться со мной", "Контакты"),
         ("Обсудить со мной правовой вопрос", "Обсудить правовой вопрос"),
-        ("Моя практика", "Направления помощи"),
+        ("Моя практика", "Практика"),
         ("Мои материалы", "Публикации"),
         ("Мои контакты", "Контакты"),
         ("Как я работаю", "Порядок работы"),
         ("Все мои правовые материалы", "Все правовые материалы"),
         ("Посмотреть ориентиры моего вознаграждения", "Ориентиры вознаграждения"),
+        ("Налоговые Споры", "Налоговые споры"),
+        ("Недвижимость И Земельные Споры", "Недвижимость и земельные споры"),
+        ("Трудовые Споры", "Трудовые споры"),
+        ("Мои Правовые Материалы", "Правовые материалы"),
+        ("Земельное Право И Налоги", "Земельное право и налоги"),
+        ("Договорное Право", "Договорное право"),
+        ("Арбитраж И Специальные Экономические Меры", "Арбитраж и специальные экономические меры"),
+        ("3 500 ₽ .", "3 500 ₽."),
+        ("Правовая помощь гражданам и организациям по судебным спорам, договорным и имущественным вопросам, сопровождению и аналитике.",
+         "Правовая помощь гражданам и организациям по судебным спорам, договорным и имущественным вопросам, а также в рамках сопровождения и правовой аналитики."),
+        ("Правовая помощь гражданам и организациям по вопросам гражданского и арбитражного права, семейным, наследственным и потребительским спорам",
+         "Правовая помощь гражданам и организациям по вопросам гражданского и арбитражного права, включая семейные, наследственные и потребительские споры"),
+        ("Я использую сайт для первичного контакта по общему вопросу.",
+         "Сайт предназначен для первичного обращения по общему вопросу."),
+        ("Что я согласую с доверителем", "Что согласуется до начала работы"),
+        ("В первом обращении достаточно назвать общую категорию правового вопроса",
+         "После первичного сообщения можно согласовать дальнейший формат связи"),
+        ("Ссылка открывает мой профиль в MAX. Первое сообщение можно ограничить общей категорией вопроса; документы и подробности дела я прошу передавать только после согласования безопасного способа связи.",
+         "Ссылка и QR-код ведут к одному профилю в MAX. В первом сообщении достаточно обозначить общую категорию вопроса."),
+        ("Апелляционное и кассационное обжалование оформляются как самостоятельные этапы.",
+         "Апелляционное и кассационное обжалование оформляются как самостоятельные этапы."),
     ]
     for old, new in replacements:
         raw = raw.replace(old, new)
+
+    # Keep the biography's introduction factual, without repeating the name or listing work twice.
+    if page.as_posix().endswith("about/index.html"):
+        raw = raw.replace(
+            "Я окончила Московскую государственную юридическую академию в 2000 году",
+            "Окончила Московскую государственную юридическую академию в 2000 году",
+        )
+
+    # Consolidate repeated wording on the mandate page without changing the legal scope or facts.
+    if page.as_posix().endswith("documents/index.html"):
+        raw = raw.replace(
+            "Я оказываю правовую помощь на основании индивидуального письменного соглашения с доверителем. В соглашении я фиксирую предмет поручения, объём помощи, размер моего вознаграждения, порядок компенсации расходов, ответственность сторон и другие необходимые условия.",
+            "Правовая помощь оказывается на основании индивидуального письменного соглашения. В нём закрепляются предмет и границы поручения, состав действий, вознаграждение, порядок компенсации расходов, ответственность сторон и другие необходимые условия.",
+        )
+        raw = raw.replace(
+            "До начала работы я согласую порядок взаимодействия и содержание поручения. Объём помощи определяю с учётом обстоятельств, документов, процессуальной стадии и задач доверителя.",
+            "До начала работы обсуждаются обстоятельства, состав документов, процессуальная стадия и задачи доверителя; согласованные действия и порядок взаимодействия закрепляются в соглашении.",
+        )
+        raw = raw.replace(
+            "Я составляю соглашение с учётом предмета и объёма конкретного поручения.",
+            "Условия соглашения определяются предметом и объёмом конкретного поручения.",
+        )
+        raw = raw.replace(
+            "Я соблюдаю режим адвокатской тайны и защищаю сведения, полученные в связи с оказанием правовой помощи. Я предлагаю сначала связаться со мной по телефону или электронной почте, чтобы согласовать формат дальнейшего взаимодействия и безопасный способ передачи материалов.",
+            "Соблюдаю режим адвокатской тайны и защищаю сведения, полученные в связи с оказанием правовой помощи. Для согласования формата взаимодействия и безопасного способа передачи материалов можно сначала связаться по телефону или электронной почте.",
+        )
+        raw = raw.replace(
+            "Я прошу не направлять по электронной почте без предварительного согласования подробное описание дела, паспортные данные, сведения о здоровье, судебные документы и материалы с персональными данными других лиц. На сайте я не предусматриваю загрузку документов.",
+            "Без предварительного согласования не следует направлять по электронной почте подробное описание дела, паспортные данные, сведения о здоровье, судебные документы и материалы с персональными данными других лиц. Загрузка документов на сайте не предусмотрена.",
+        )
+
+    # The biography starts with the professional role; the name is already in the page title.
+    if page.as_posix().endswith("about/index.html"):
+        raw = raw.replace(
+            "Меня зовут Елена Алексеевна Глебова. Осуществляю адвокатскую деятельность в Адвокатской палате Московской области. Представляю доверителей в судах, провожу правовую аналитику, проверяю договоры и готовлю правовые позиции.",
+            "Осуществляю адвокатскую деятельность в Адвокатской палате Московской области. Представляю доверителей в судах.",
+        )
+        raw = raw.replace(
+            "Я окончила Московскую государственную юридическую академию в 2000 году",
+            "Окончила Московскую государственную юридическую академию в 2000 году",
+        )
+
+    # The phone conversation and its limits are explained once on the process page.
+    if page.as_posix().endswith("working-process/index.html"):
+        raw = raw.replace(
+            "Безопасный способ передачи материалов согласуется отдельно.</p><p>Само обращение не означает, что я приняла поручение или заключила соглашение.",
+            "Само обращение не означает принятия поручения или заключения соглашения.",
+        )
+
+    # The same stage-fee note was accidentally repeated in the long pricing explanation.
+    if page.as_posix().endswith("remuneration/index.html"):
+        repeated = "Апелляционное и кассационное обжалование оформляются как самостоятельные этапы."
+        position = raw.rfind(repeated)
+        first = raw.find(repeated)
+        if position > first >= 0:
+            raw = raw[:position] + raw[position + len(repeated):]
+
+    # Remove the explicit pronoun in editorial copy while leaving the first-person verb intact.
+    raw = re.sub(r'(>\s*)[Яя]\s+([а-яё])', lambda m: m.group(1) + m.group(2).upper(), raw)
+    raw = re.sub(r'([.!?]\s+)[Яя]\s+([а-яё])', lambda m: m.group(1) + m.group(2).upper(), raw)
+    raw = re.sub(r'(?<![A-Za-zА-Яа-яЁё0-9_])[Яя]\s+', '', raw)
+
+    # Restore legal examples, answers and article text exactly as authored.
+    for marker, block in protected:
+        raw = raw.replace(marker, block)
     return raw
 
 
@@ -329,18 +500,10 @@ def main() -> int:
         raw = add_person_and_service_schema(raw, page, dist)
         raw = enhance_article(raw, page, dist)
         raw = localize_html_urls(raw, page, dist)
-        # The distinction between the free organisational call and paid legal advice is visible site-wide.
-        if "</footer>" in raw and "footer-brief-note" not in raw:
-            footer_note = (
-                '<div class="container footer-brief-note"><p><strong>Ознакомительная консультация по телефону — бесплатно.</strong> '
-                'Это краткое организационное обсуждение общей категории обращения, возможного объёма правовой помощи, стоимости и записи; '
-                'без изучения документов и рекомендаций по существу. '
-                '<strong>Развёрнутая консультация (до 1 часа) — 3 500 ₽.</strong></p></div>'
-            )
-            raw = raw.replace("</footer>", footer_note + "</footer>", 1)
-        # Native disclosure navigation keeps the mobile header compact without JavaScript.
-        nav_pattern = re.compile(r'<nav class="primary-nav" aria-label="Основная навигация">.*?</nav>', re.S)
-        raw = nav_pattern.sub(lambda match: '<details class="mobile-nav"><summary>Меню</summary>' + match.group(0) + '</details>', raw, count=1)
+        # Remove legacy footer notes; the distinction is now explained in the relevant page content.
+        raw = re.sub(r'<div class="container footer-brief-note">.*?</div>', '', raw, flags=re.S)
+        raw = raw.replace("Документы и соглашения", "Оформление поручения")
+        # Preserve all seven navigation routes in the HTML; the Contacts item is intentionally hidden in the header to leave room for the call action.
         if "consumer-penalty-damages-2021-2026" in page.as_posix():
             raw = re.sub(r'<meta name="robots" content="[^"]*">', '<meta name="robots" content="noindex,follow">', raw, count=1, flags=re.I)
         # Test builds must not be indexable even if a page template says index,follow.
@@ -353,6 +516,19 @@ def main() -> int:
         parser = PageParser()
         parser.feed(raw)
         rel = page.relative_to(dist).as_posix()
+        nav_match = re.search(r'(?s)<nav class="primary-nav" aria-label="Основная навигация">.*?</nav>', raw)
+        if not nav_match:
+            errors.append(f"{rel}: primary navigation is missing")
+        else:
+            nav_html = nav_match.group(0)
+            nav_links = re.findall(r'<a class="nav-link" href=', nav_html)
+            if len(nav_links) != 7:
+                errors.append(f"{rel}: expected 7 primary navigation anchors in HTML (6 are displayed in the header), found {len(nav_links)}")
+            for label in ("Практика", "Цены и оплата", "Порядок работы", "Обо мне", "Оформление поручения", "Публикации", "Контакты"):
+                if label not in nav_html:
+                    errors.append(f"{rel}: primary navigation label is missing: {label}")
+        if '<details class="mobile-nav">' in raw:
+            errors.append(f"{rel}: primary navigation must not be hidden in a collapsed disclosure")
         if not parser.has_lang:
             errors.append(f"{rel}: html lang=ru is missing")
         if not parser.has_title:
@@ -364,10 +540,14 @@ def main() -> int:
         if parser.h1_count != 1:
             errors.append(f"{rel}: expected exactly one h1, found {parser.h1_count}")
         if rel == "remuneration/index.html":
-            if "Ознакомительная консультация по телефону" not in raw or "бесплатно" not in raw:
-                errors.append(f"{rel}: free introductory phone consultation wording is missing")
-            if "Развёрнутая консультация (до 1 часа)" not in raw or "3 500 ₽" not in raw:
-                errors.append(f"{rel}: paid consultation wording or fee is missing")
+            if "Предварительная беседа по телефону" not in raw or "бесплатно" not in raw:
+                errors.append(f"{rel}: free preliminary phone conversation wording is missing")
+            if "не является юридической консультацией" not in raw:
+                errors.append(f"{rel}: preliminary conversation must be distinguished from legal consultation")
+            if "Юридическая консультация (до 1 часа)" not in raw or "3 500 ₽" not in raw:
+                errors.append(f"{rel}: paid legal consultation wording or fee is missing")
+            if "Ознакомительная консультация по телефону" in raw:
+                errors.append(f"{rel}: preliminary conversation is incorrectly labelled as a consultation")
             if re.search(r"(?<![А-Яа-яЁё])Я(?=[\\s,.:—])", raw):
                 errors.append(f"{rel}: first-person pronoun remains in the fee page")
         if parser.form_count:
