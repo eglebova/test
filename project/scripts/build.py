@@ -436,6 +436,19 @@ def resolve_local(path: str, dist: Path, page: Path) -> bool:
     return any(p.is_file() for p in candidates)
 
 
+
+def replace_header_contact(raw: str) -> str:
+    """Replace the direct-call header CTA with an accessible, no-JS contact menu."""
+    pattern = r'<a class="header-call"[^>]*>[\s\S]*?</a>'
+    return re.sub(pattern, lambda _: '''<details class="header-contact">
+  <summary class="header-call"><span class="call-icon" aria-hidden="true">↗</span><span>Связаться</span><span class="header-contact-caret" aria-hidden="true">⌄</span></summary>
+  <div class="header-contact-menu" aria-label="Способы связи">
+    <a class="header-contact-option" href="tel:+79104707654"><span class="header-contact-label">Телефон</span><strong>+7 (910) 470-76-54</strong></a>
+    <a class="header-contact-option" href="mailto:e_glebova@mail.ru"><span class="header-contact-label">Электронная почта</span><strong>e_glebova@mail.ru</strong></a>
+    <a class="header-contact-option" href="https://max.ru/u/f9LHodD0cOIGv2USorbITiorIcZg-hxVehoxHeCMRuY2nJw7PJPJMc7vE-8" target="_blank" rel="noopener noreferrer"><span class="header-contact-label">Мессенджер MAX</span><strong>Открыть профиль для связи ↗</strong></a>
+  </div>
+</details>''', raw, count=1, flags=re.I)
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Build static site and run content/link QA")
     ap.add_argument("--origin", required=True, help="Canonical HTTPS origin, e.g. https://example.ru")
@@ -488,6 +501,7 @@ def main() -> int:
     for page in html_files:
         raw = page.read_text(encoding="utf-8")
         raw = polish_editorial_copy(raw, page)
+        raw = replace_header_contact(raw)
         public_path = url_for_page(dist, page)
         canonical = origin + public_path
         marker = '  <!-- canonical and og:url are injected by scripts/build.py after the domain is selected -->'

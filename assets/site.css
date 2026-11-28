@@ -993,3 +993,97 @@ body:not(.page-remuneration) .footer-brief-note { display: none !important; }
   .editorial-disclosure > summary::after,
   .editorial-disclosure__body { transition-duration: .01ms !important; }
 }
+
+
+/* Header contact disclosure: native details/summary keeps the menu keyboard-accessible without JavaScript. */
+.site-header .header-contact {
+  position: relative;
+  z-index: 5;
+  grid-area: call;
+  justify-self: end;
+}
+.site-header .header-contact > summary {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.site-header .header-contact > summary::-webkit-details-marker { display: none; }
+.site-header .header-contact-caret {
+  margin-left: 3px;
+  color: #8a785b;
+  font-size: 15px;
+  line-height: 1;
+  transition: transform .2s ease;
+}
+.site-header .header-contact[open] .header-contact-caret { transform: rotate(180deg); }
+.site-header .header-contact-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  width: min(310px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid rgba(180,154,112,.42);
+  border-radius: 16px;
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 18px 44px rgba(23,43,70,.16), inset 0 1px 0 rgba(255,255,255,.95);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.site-header .header-contact-option {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px 17px;
+  border-bottom: 1px solid rgba(23,43,70,.08);
+  transition: background .18s ease, color .18s ease;
+}
+.site-header .header-contact-option:last-child { border-bottom: 0; }
+.site-header .header-contact-option:hover,
+.site-header .header-contact-option:focus-visible { color: var(--navy); background: #f6f3ec; }
+.site-header .header-contact-label {
+  color: #87775b;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.site-header .header-contact-option strong {
+  overflow-wrap: anywhere;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+@media (max-width: 560px) {
+  .site-header .header-contact-menu { top: calc(100% + 9px); }
+  .site-header .header-contact-option { padding: 12px 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-header .header-contact-caret,
+  .site-header .header-contact-option { transition-duration: .01ms !important; }
+}
+
+/* A modest recognition block keeps the original certificate readable and in context. */
+.recognition-section { padding-block: 76px; background: linear-gradient(180deg, rgba(238,236,230,.52), rgba(255,255,255,.62)); border-block: 1px solid rgba(180,154,112,.18); }
+.recognition-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 360px); align-items: center; gap: clamp(42px, 7vw, 90px); }
+.recognition-copy { max-width: 640px; }
+.recognition-copy h2 { margin: 13px 0 20px; color: var(--navy); font-family: var(--serif); font-size: clamp(31px, 3.6vw, 43px); font-weight: 500; line-height: 1.15; letter-spacing: -.03em; }
+.recognition-copy p { max-width: 620px; color: var(--slate); }
+.recognition-copy .small-note { margin-top: 20px; }
+.recognition-document { width: 100%; max-width: 290px; justify-self: center; margin: 0; padding: 11px; border: 1px solid rgba(180,154,112,.46); background: #f7f4ec; box-shadow: 12px 14px 0 rgba(23,43,70,.055), 0 12px 32px rgba(23,43,70,.08); }
+.recognition-document a { display: block; }
+.recognition-document img { display: block; width: 100%; height: auto; border: 1px solid rgba(23,43,70,.12); }
+.recognition-document figcaption { padding: 10px 4px 1px; color: #746b5d; font-size: 10px; line-height: 1.5; text-align: center; }
+@media (max-width: 820px) {
+  .recognition-layout { grid-template-columns: 1fr; gap: 30px; }
+  .recognition-document { max-width: 330px; }
+}
+@media (max-width: 560px) {
+  .recognition-section { padding-block: 54px; }
+  .recognition-document { max-width: min(82vw, 290px); }
+}
